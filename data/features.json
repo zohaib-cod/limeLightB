@@ -1,0 +1,35 @@
+[
+  {
+    "id": "feat-1",
+    "title": "FREE NATIONWIDE SHIPPING",
+    "subtitle": "On orders above Rs. 2,490",
+    "order": 1,
+    "isActive": true,
+    "createdAt": "2026-11-15T19:42:52.196Z",
+    "updatedAt": "2026-11-15T19:46:30.686Z"
+  },
+  {
+    "id": "feat-2",
+    "title": "100% GENUINE FABRIC",
+    "subtitle": "Pure Cottons, Velvets & Karandi",
+    "order": 2,
+    "isActive": true,
+    "createdAt": "2026-11-15T19:42:52.196Z"
+  },
+  {
+    "id": "feat-3",
+    "title": "CASH ON DELIVERY",
+    "subtitle": "Available all across Pakistan",
+    "order": 3,
+    "isActive": true,
+    "createdAt": "2026-11-15T19:42:52.196Z"
+  },
+  {
+    "id": "feat-4",
+    "title": "EASY EXCHANGE",
+    "subtitle": "30-Day Hassle Free Returns",
+    "order": 4,
+    "isActive": true,
+    "createdAt": "2026-11-15T19:42:52.196Z"
+  }
+]

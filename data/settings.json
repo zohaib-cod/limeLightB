@@ -1,0 +1,19 @@
+{
+  "logoType": "text",
+  "textLogo": {
+    "part1": "LIME",
+    "part2": "LIGHT",
+    "part1Color": "#23ac95",
+    "part2Color": "#cec72e",
+    "singleText": "LIMELIGHT",
+    "letterSpacing": "0.24em",
+    "fontSize": "22px"
+  },
+  "imageLogo": {
+    "url": "",
+    "alt": "Limelight Official",
+    "height": 34
+  },
+  "whatsappNumber": "+92 345 7867016",
+  "updatedAt": "2026-11-15T21:48:12.266Z"
+}

@@ -1,0 +1,51 @@
+[
+  {
+    "id": "hero",
+    "name": "Hero Banner Slider",
+    "description": "Large rotating hero campaign banners at top of store",
+    "order": 1,
+    "enabled": true
+  },
+  {
+    "id": "features",
+    "name": "Feature Highlights (USP Bar)",
+    "description": "4-point customer value propositions (Free Shipping, COD, etc.)",
+    "order": 2,
+    "enabled": true
+  },
+  {
+    "id": "unstitched",
+    "name": "Unstitched Fabrics Section",
+    "description": "Luxury unstitched velvets, karandi, and khaddar suits with editorial banner",
+    "order": 3,
+    "enabled": true
+  },
+  {
+    "id": "rtw",
+    "name": "Ready To Wear & Co-Ords",
+    "description": "Pret casual kurtis, 2-piece co-ord sets with split campaign banners",
+    "order": 4,
+    "enabled": true
+  },
+  {
+    "id": "collections",
+    "name": "Shop By Collection (Curated Editions)",
+    "description": "4-tile curated edition grid (Winter Velvet, Co-Ords, Organza, Khaddar)",
+    "order": 5,
+    "enabled": true
+  },
+  {
+    "id": "men",
+    "name": "Men Ethnic Collection",
+    "description": "Men latha, embroidered kurta pajama, and waistcoats",
+    "order": 6,
+    "enabled": true
+  },
+  {
+    "id": "new-arrivals",
+    "name": "New Arrivals Showcase",
+    "description": "Latest season drops with tab filters and product cards",
+    "order": 7,
+    "enabled": true
+  }
+]

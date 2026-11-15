@@ -1,0 +1,260 @@
+[
+  {
+    "id": "act-1794782605943",
+    "action": "New Subscriber",
+    "details": "New newsletter subscriber: test.customer@gmail.com",
+    "timestamp": "2026-11-15T22:43:25.943Z"
+  },
+  {
+    "id": "act-1794781916469",
+    "action": "Sections Reset",
+    "details": "Reset homepage sections to default order",
+    "timestamp": "2026-11-15T22:31:56.469Z"
+  },
+  {
+    "id": "act-1794781909778",
+    "action": "Sections Reordered",
+    "details": "Homepage sections display order updated",
+    "timestamp": "2026-11-15T22:31:49.778Z"
+  },
+  {
+    "id": "act-1794781646302",
+    "action": "Route Updated",
+    "details": "Updated navigation route: MEN",
+    "timestamp": "2026-11-15T22:27:26.302Z"
+  },
+  {
+    "id": "act-1794779830537",
+    "action": "Route Updated",
+    "details": "Updated navigation route: GIRLS",
+    "timestamp": "2026-11-15T21:57:10.537Z"
+  },
+  {
+    "id": "act-1794779813529",
+    "action": "Route Updated",
+    "details": "Updated navigation route: MEN",
+    "timestamp": "2026-11-15T21:56:53.529Z"
+  },
+  {
+    "id": "act-1794779811133",
+    "action": "Route Updated",
+    "details": "Updated navigation route: NEW IN",
+    "timestamp": "2026-11-15T21:56:51.133Z"
+  },
+  {
+    "id": "act-1794779810104",
+    "action": "Route Updated",
+    "details": "Updated navigation route: NEW IN",
+    "timestamp": "2026-11-15T21:56:50.104Z"
+  },
+  {
+    "id": "act-1794779740633",
+    "action": "Route Updated",
+    "details": "Updated navigation route: NEW IN",
+    "timestamp": "2026-11-15T21:55:40.633Z"
+  },
+  {
+    "id": "act-1794779718711",
+    "action": "Route Updated",
+    "details": "Updated navigation route: NEW IN",
+    "timestamp": "2026-11-15T21:55:18.711Z"
+  },
+  {
+    "id": "act-1794779301395",
+    "action": "Route Deleted",
+    "details": "Deleted navigation route: SPECIAL OFFERS",
+    "timestamp": "2026-11-15T21:48:21.395Z"
+  },
+  {
+    "id": "act-1794779296836",
+    "action": "Route Added",
+    "details": "Added new navigation route: SPECIAL OFFERS (#sale)",
+    "timestamp": "2026-11-15T21:48:16.836Z"
+  },
+  {
+    "id": "act-1794779292266",
+    "action": "Settings Updated",
+    "details": "Brand settings and logo configuration updated",
+    "timestamp": "2026-11-15T21:48:12.266Z"
+  },
+  {
+    "id": "act-1794778967613",
+    "action": "Slide Deleted",
+    "details": "Removed slide \"SIGNATURE WINTER COUTURE\" (ID: slide-1794770916956-759)",
+    "timestamp": "2026-11-15T21:42:47.613Z"
+  },
+  {
+    "id": "act-1794778768730",
+    "action": "Order Updated",
+    "details": "Order #LM-868463 status changed to Delivered",
+    "timestamp": "2026-11-15T21:39:28.731Z"
+  },
+  {
+    "id": "act-1794778755047",
+    "action": "Order Updated",
+    "details": "Order #LM-868463 status changed to Shipped",
+    "timestamp": "2026-11-15T21:39:15.047Z"
+  },
+  {
+    "id": "act-1794778656151",
+    "action": "Order Updated",
+    "details": "Order #LM-868463 status changed to Confirmed",
+    "timestamp": "2026-11-15T21:37:36.151Z"
+  },
+  {
+    "id": "act-1794778626858",
+    "action": "Order Placed",
+    "details": "Order #LM-868463 placed by Ali Zohaib (Rs. 2,490)",
+    "timestamp": "2026-11-15T21:37:06.858Z"
+  },
+  {
+    "id": "act-1794778033169",
+    "action": "Order Placed",
+    "details": "Order #LM-843032 placed by Zohaib Test (Rs. 5,490)",
+    "timestamp": "2026-11-15T21:27:13.170Z"
+  },
+  {
+    "id": "act-1794778024472",
+    "action": "User Login",
+    "details": "Customer logged in: Zohaib Test (usr-016514)",
+    "timestamp": "2026-11-15T21:27:04.472Z"
+  },
+  {
+    "id": "act-1794778016514",
+    "action": "User Registered",
+    "details": "New customer account: Zohaib Test (zohaib.test@example.com)",
+    "timestamp": "2026-11-15T21:26:56.514Z"
+  },
+  {
+    "id": "act-1794777195521",
+    "action": "Order Updated",
+    "details": "Order #LM-389225 status changed to Confirmed",
+    "timestamp": "2026-11-15T21:13:15.521Z"
+  },
+  {
+    "id": "act-1794777172541",
+    "action": "Order Placed",
+    "details": "Order #LM-389225 placed by Cillum voluptatem ad (Rs. 3,490)",
+    "timestamp": "2026-11-15T21:12:52.541Z"
+  },
+  {
+    "id": "act-1794776086753",
+    "action": "New Arrival Deleted",
+    "details": "Deleted \"Test Silk Digital Print Dupatta\"",
+    "timestamp": "2026-11-15T20:54:46.753Z"
+  },
+  {
+    "id": "act-1794776086751",
+    "action": "New Arrival Updated",
+    "details": "Updated \"Test Silk Digital Print Dupatta\"",
+    "timestamp": "2026-11-15T20:54:46.751Z"
+  },
+  {
+    "id": "act-1794776086748",
+    "action": "New Arrival Created",
+    "details": "Added \"Test Silk Digital Print Dupatta\" (JUST ARRIVED)",
+    "timestamp": "2026-11-15T20:54:46.748Z"
+  },
+  {
+    "id": "act-1794775648239",
+    "action": "Collection Updated",
+    "details": "Updated collection \"CO-ORD SETS\"",
+    "timestamp": "2026-11-15T20:47:28.239Z"
+  },
+  {
+    "id": "act-1794775631930",
+    "action": "Collection Updated",
+    "details": "Updated collection \"CO-ORD SETS\"",
+    "timestamp": "2026-11-15T20:47:11.930Z"
+  },
+  {
+    "id": "act-1794775604251",
+    "action": "Collection Deleted",
+    "details": "Deleted collection \"UPDATED FESTIVE CHIFFON\"",
+    "timestamp": "2026-11-15T20:46:44.251Z"
+  },
+  {
+    "id": "act-1794775604248",
+    "action": "Collection Updated",
+    "details": "Updated collection \"UPDATED FESTIVE CHIFFON\"",
+    "timestamp": "2026-11-15T20:46:44.248Z"
+  },
+  {
+    "id": "act-1794775604244",
+    "action": "Collection Created",
+    "details": "Added curated collection \"TEST FESTIVE CHIFFON\"",
+    "timestamp": "2026-11-15T20:46:44.244Z"
+  },
+  {
+    "id": "act-1794775057729",
+    "action": "Product Deleted",
+    "details": "Removed product \"Test Western Floral Co-Ord\" (ID: prod-1794775049695-412)",
+    "timestamp": "2026-11-15T20:37:37.729Z"
+  },
+  {
+    "id": "act-1794775049731",
+    "action": "Product Created",
+    "details": "Added product \"Test Western Floral Co-Ord\" (Rs. 5,990)",
+    "timestamp": "2026-11-15T20:37:29.731Z"
+  },
+  {
+    "id": "act-1794773944611",
+    "action": "Banner Updated",
+    "details": "Updated editorial banner \"SIGNATURE WINTER SHAWLS & SUITS\"",
+    "timestamp": "2026-11-15T20:19:04.611Z"
+  },
+  {
+    "id": "act-1794773179610",
+    "action": "Product Deleted",
+    "details": "Removed product \"ZOHAIB SPECIAL WINTER EMBROIDERED\" (ID: prod-1794773164455-935)",
+    "timestamp": "2026-11-15T20:06:19.610Z"
+  },
+  {
+    "id": "act-1794773164477",
+    "action": "Product Created",
+    "details": "Added product \"ZOHAIB SPECIAL WINTER EMBROIDERED\" (Rs. 9,490)",
+    "timestamp": "2026-11-15T20:06:04.477Z"
+  },
+  {
+    "id": "act-1794772501928",
+    "action": "Banners Reset",
+    "details": "Reset section banners to default Limelight editorial values",
+    "timestamp": "2026-11-15T19:55:01.928Z"
+  },
+  {
+    "id": "act-1794772496220",
+    "action": "Banner Updated",
+    "details": "Updated editorial banner \"TEST UPLOAD BANNER\"",
+    "timestamp": "2026-11-15T19:54:56.220Z"
+  },
+  {
+    "id": "act-1794772489897",
+    "action": "Banner Updated",
+    "details": "Updated editorial banner \"UNSTITCHED FABRICS\"",
+    "timestamp": "2026-11-15T19:54:49.897Z"
+  },
+  {
+    "id": "act-1794771990686",
+    "action": "Feature Updated",
+    "details": "Updated feature highlight \"FREE NATIONWIDE SHIPPING\"",
+    "timestamp": "2026-11-15T19:46:30.686Z"
+  },
+  {
+    "id": "act-1794771799771",
+    "action": "Feature Deleted",
+    "details": "Deleted feature \"TEST HIGHLIGHT\" (ID: feat-1794771791526-288)",
+    "timestamp": "2026-11-15T19:43:19.771Z"
+  },
+  {
+    "id": "act-1794771791526",
+    "action": "Feature Created",
+    "details": "Added feature highlight \"TEST HIGHLIGHT\"",
+    "timestamp": "2026-11-15T19:43:11.526Z"
+  },
+  {
+    "id": "act-1794771445274",
+    "action": "Slide Published",
+    "details": "Uploaded new slide \"zohaib testing\"",
+    "timestamp": "2026-11-15T19:37:25.274Z"
+  }
+]

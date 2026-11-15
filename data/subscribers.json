@@ -1,0 +1,23 @@
+[
+  {
+    "id": "sub-1794782605590",
+    "email": "test.customer@gmail.com",
+    "status": "active",
+    "source": "Storefront Footer",
+    "subscribedAt": "2026-11-15T22:43:25.590Z"
+  },
+  {
+    "id": "sub-1",
+    "email": "ayesha.khan@gmail.com",
+    "status": "active",
+    "source": "Storefront Newsletter",
+    "subscribedAt": "2026-11-15T18:30:00.000Z"
+  },
+  {
+    "id": "sub-2",
+    "email": "zainab.malik@outlook.com",
+    "status": "active",
+    "source": "Storefront Newsletter",
+    "subscribedAt": "2026-11-16T01:15:00.000Z"
+  }
+]

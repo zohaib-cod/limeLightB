@@ -1,0 +1,65 @@
+{
+  "newsletter": {
+    "eyebrow": "STAY CONNECTED WITH LIMELIGHT",
+    "title": "SUBSCRIBE TO OUR NEWSLETTER",
+    "description": "Subscribe to be the first to receive updates on new seasonal collections, limited pret drops, and exclusive seasonal promotions.",
+    "placeholder": "Enter your email address",
+    "buttonText": "SUBSCRIBE",
+    "successMessage": "Thank you for subscribing to Limelight updates! Check your inbox for your welcome voucher."
+  },
+  "customerCare": {
+    "title": "CUSTOMER CARE",
+    "links": [
+      { "label": "Contact Us", "url": "#customer-care" },
+      { "label": "Shipping & Handling", "url": "/category/new-in" },
+      { "label": "Exchange & Returns Policy", "url": "/category/women" },
+      { "label": "Frequently Asked Questions", "url": "#customer-care" },
+      { "label": "Track Your Order", "url": "#track-order" },
+      { "label": "Store Locator (80+ Outlets)", "url": "#store-locator" }
+    ]
+  },
+  "information": {
+    "title": "INFORMATION",
+    "links": [
+      { "label": "About Limelight Pakistan", "url": "/category/women" },
+      { "label": "Our Craft & Heritage", "url": "/category/unstitched" },
+      { "label": "Careers & Job Openings", "url": "#careers" },
+      { "label": "Privacy Policy", "url": "#privacy" },
+      { "label": "Terms & Conditions", "url": "#terms" },
+      { "label": "Fabric Care Instructions", "url": "#fabric-care" }
+    ]
+  },
+  "contact": {
+    "title": "CONTACT US",
+    "uan": "+92 345 7867016",
+    "timings": "Monday - Saturday: 9:00 AM - 6:00 PM",
+    "whatsapp": "+92 345 7867016",
+    "email": "online@limelight.pk",
+    "address": "Limelight Head Office, Lahore, Pakistan"
+  },
+  "connect": {
+    "title": "CONNECT & PAYMENTS",
+    "description": "Follow our official social accounts for style inspirations and daily looks:",
+    "socialLinks": {
+      "instagram": "https://instagram.com/limelight.pk",
+      "facebook": "https://facebook.com/limelight.pk",
+      "youtube": "https://youtube.com/@limelightpk"
+    },
+    "paymentMethods": [
+      "VISA",
+      "Mastercard",
+      "PayPak",
+      "UnionPay",
+      "COD (Cash on Delivery)"
+    ]
+  },
+  "bottomBar": {
+    "copyright": "© 2026 Limelightpk. All rights reserved. Registered Trademark.",
+    "links": [
+      { "label": "Privacy Policy", "url": "#privacy" },
+      { "label": "Terms of Service", "url": "#terms" },
+      { "label": "Sitemap", "url": "#sitemap" }
+    ]
+  }
+}
+

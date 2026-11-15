@@ -1,0 +1,55 @@
+[
+  {
+    "id": "nav-1",
+    "name": "NEW IN",
+    "slug": "new-in",
+    "href": "#new-arrivals",
+    "isSale": false,
+    "order": 1,
+    "isActive": true,
+    "description": "Just dropped in stores & online",
+    "updatedAt": "2026-11-15T21:56:51.133Z"
+  },
+  {
+    "id": "nav-2",
+    "name": "WOMEN",
+    "slug": "women",
+    "href": "#unstitched",
+    "isSale": false,
+    "order": 2,
+    "isActive": true,
+    "description": "Unstitched, Ready to Wear & Special Editions"
+  },
+  {
+    "id": "nav-3",
+    "name": "MEN",
+    "slug": "men",
+    "href": "#men",
+    "isSale": false,
+    "order": 3,
+    "isActive": true,
+    "description": "Classic Kurtas & Men Ethnic Wear",
+    "updatedAt": "2026-11-15T22:27:26.301Z"
+  },
+  {
+    "id": "nav-4",
+    "name": "GIRLS",
+    "slug": "girls",
+    "href": "hello je ",
+    "isSale": false,
+    "order": 4,
+    "isActive": true,
+    "description": "Teen & Girls Pret Collection",
+    "updatedAt": "2026-11-15T21:57:10.537Z"
+  },
+  {
+    "id": "nav-5",
+    "name": "SALE",
+    "slug": "sale",
+    "href": "#new-arrivals",
+    "isSale": true,
+    "order": 5,
+    "isActive": true,
+    "description": "Seasonal Clearance Up to 50% Off"
+  }
+]
