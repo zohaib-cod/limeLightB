@@ -1013,6 +1013,8 @@ const DEFAULT_SETTINGS = {
     letterSpacing: "0.22em",
     fontSize: "22px"
   },
+  headerBg: "#000000",
+  subnavBg: "#000000",
   imageLogo: {
     url: "",
     alt: "Zimal Collection Official (www.zimalcollection.com)",

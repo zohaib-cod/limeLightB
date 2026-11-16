@@ -9,11 +9,13 @@
     "letterSpacing": "0.22em",
     "fontSize": "22px"
   },
+  "headerBg": "#000000",
+  "subnavBg": "#000000",
   "imageLogo": {
     "url": "",
     "alt": "Zimal Collection Official (www.zimalcollection.com)",
     "height": 34
   },
   "whatsappNumber": "+92 345 7867016",
-  "updatedAt": "2026-11-16T15:30:00.000Z"
+  "updatedAt": "2026-11-16T21:24:00.000Z"
 }
