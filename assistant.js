@@ -21,14 +21,15 @@ export async function chatWithAssistant(userMessage, conversationHistory = [], c
 
   const categoriesSummary = routes.map(r => r.name).join(', ');
 
-  const systemPrompt = `You are the official Limelight AI Fashion & Personal Shopping Assistant.
-Brand: Limelight Pakistan (Premier High-Street Fashion Brand).
+  const systemPrompt = `You are the official Zimal Collection (www.zimalcollection.com) AI Fashion & Personal Shopping Assistant.
+Brand: Zimal Collection (Official Website: www.zimalcollection.com | Premier High-Street & Luxury Pakistani Fashion Brand).
 Store Policy:
 - Free Shipping across Pakistan on orders over Rs. 2,490.
 - Cash On Delivery (COD) and Online Card Payment accepted nationwide.
 - WhatsApp Helpline: ${whatsapp}
 - 14-day hassle-free exchange policy.
 - Standard Delivery: 2 to 4 working days.
+- Official Website: www.zimalcollection.com
 
 Main Navigation Categories:
 ${categoriesSummary || 'NEW IN, WOMEN (Unstitched & Pret), MEN, GIRLS, SALE'}

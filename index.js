@@ -127,7 +127,7 @@ function getActivities() {
     {
       id: 'act-init-1',
       action: 'System Initialized',
-      details: 'Limelight Slider Backend online and ready',
+      details: 'Zimal Collection Backend online and ready',
       timestamp: new Date().toISOString()
     },
     {
@@ -1005,17 +1005,17 @@ const DEFAULT_NAVIGATION = [
 const DEFAULT_SETTINGS = {
   logoType: "text",
   textLogo: {
-    part1: "LIME",
-    part2: "LIGHT",
+    part1: "ZIMAL ",
+    part2: "COLLECTION",
     part1Color: "#23ac95",
     part2Color: "#cec72e",
-    singleText: "LIMELIGHT",
-    letterSpacing: "0.24em",
+    singleText: "www.zimalcollection.com",
+    letterSpacing: "0.22em",
     fontSize: "22px"
   },
   imageLogo: {
     url: "",
-    alt: "Limelight Official",
+    alt: "Zimal Collection Official (www.zimalcollection.com)",
     height: 34
   },
   whatsappNumber: "+92 345 7867016",
@@ -1164,12 +1164,12 @@ function writeSections(sections) {
 // Default Seed Footer Configuration
 const DEFAULT_FOOTER = {
   newsletter: {
-    eyebrow: "STAY CONNECTED WITH LIMELIGHT",
+    eyebrow: "STAY CONNECTED WITH WWW.ZIMALCOLLECTION.COM",
     title: "SUBSCRIBE TO OUR NEWSLETTER",
-    description: "Subscribe to be the first to receive updates on new seasonal collections, limited pret drops, and exclusive seasonal promotions.",
+    description: "Subscribe to be the first to receive updates on new seasonal collections, limited pret drops, and exclusive seasonal promotions from www.zimalcollection.com.",
     placeholder: "Enter your email address",
     buttonText: "SUBSCRIBE",
-    successMessage: "Thank you for subscribing to Limelight updates! Check your inbox for your welcome voucher."
+    successMessage: "Thank you for subscribing to Zimal Collection updates! Check your inbox for your welcome voucher."
   },
   customerCare: {
     title: "CUSTOMER CARE",
@@ -1179,13 +1179,13 @@ const DEFAULT_FOOTER = {
       { label: "Exchange & Returns Policy", url: "/category/women" },
       { label: "Frequently Asked Questions", url: "#customer-care" },
       { label: "Track Your Order", url: "#track-order" },
-      { label: "Store Locator (80+ Outlets)", url: "#store-locator" }
+      { label: "Store Locator", url: "#store-locator" }
     ]
   },
   information: {
     title: "INFORMATION",
     links: [
-      { label: "About Limelight Pakistan", url: "/category/women" },
+      { label: "About Zimal Collection", url: "/category/women" },
       { label: "Our Craft & Heritage", url: "/category/unstitched" },
       { label: "Careers & Job Openings", url: "#careers" },
       { label: "Privacy Policy", url: "#privacy" },
@@ -1198,16 +1198,16 @@ const DEFAULT_FOOTER = {
     uan: "+92 345 7867016",
     timings: "Monday - Saturday: 9:00 AM - 6:00 PM",
     whatsapp: "+92 345 7867016",
-    email: "online@limelight.pk",
-    address: "Limelight Head Office, Lahore, Pakistan"
+    email: "online@zimalcollection.com",
+    address: "Zimal Collection Flagship Store, Pakistan"
   },
   connect: {
     title: "CONNECT & PAYMENTS",
     description: "Follow our official social accounts for style inspirations and daily looks:",
     socialLinks: {
-      instagram: "https://instagram.com/limelight.pk",
-      facebook: "https://facebook.com/limelight.pk",
-      youtube: "https://youtube.com/@limelightpk"
+      instagram: "https://instagram.com/zimalcollection",
+      facebook: "https://facebook.com/zimalcollection",
+      youtube: "https://youtube.com/@zimalcollection"
     },
     paymentMethods: [
       "VISA",
@@ -1218,7 +1218,7 @@ const DEFAULT_FOOTER = {
     ]
   },
   bottomBar: {
-    copyright: "© 2026 Limelightpk. All rights reserved. Registered Trademark.",
+    copyright: "© 2026 www.zimalcollection.com. All rights reserved. Registered Trademark.",
     links: [
       { label: "Privacy Policy", url: "#privacy" },
       { label: "Terms of Service", url: "#terms" },
@@ -2661,7 +2661,7 @@ app.get('/api/orders/track/:query', (req, res) => {
         {
           id: 'step-1',
           title: 'Order Placed & Received',
-          desc: 'Your order was successfully recorded in the Limelight system.',
+          desc: 'Your order was successfully recorded in the Zimal Collection (www.zimalcollection.com) system.',
           completed: true,
           date: order.createdAt || order.date
         },
@@ -3052,7 +3052,7 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
       return res.json({
         success: true,
         alreadySubscribed: true,
-        message: 'You are already subscribed to Limelight newsletter!'
+        message: 'You are already subscribed to www.zimalcollection.com newsletter!'
       });
     }
 
@@ -3078,7 +3078,7 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
     logActivity('New Subscriber', `New newsletter subscriber: ${cleanEmail}`);
     res.status(201).json({
       success: true,
-      message: 'Thank you for subscribing to Limelight updates! Check your inbox for your welcome voucher.',
+      message: 'Thank you for subscribing to Zimal Collection updates! Check your inbox for your welcome voucher.',
       subscriber: newSub
     });
   } catch (err) {
@@ -3391,7 +3391,7 @@ app.get('/api/system/status', (req, res) => {
 
 // Start Server and Connect to MongoDB Atlas
 app.listen(PORT, '0.0.0.0', async () => {
-  console.log(`🚀 Limelight Slider Backend Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Zimal Collection Backend Server (www.zimalcollection.com) running on http://localhost:${PORT}`);
   console.log(`📁 Uploads available at http://localhost:${PORT}/uploads`);
   console.log(`📡 Slides API at http://localhost:${PORT}/api/slides`);
   console.log(`🤖 AI Shopping Assistant online (Groq ${process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'})`);
