@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -446,161 +447,15 @@ function writeBanners(banners) {
   }
 }
 
-// Default Catalog Products Seed (including all 4 Unstitched winter collection items from screenshot)
-const DEFAULT_PRODUCTS = [
-  {
-    id: "un-1",
-    title: "3 Piece Embroidered Velvet Suit",
-    category: "Unstitched",
-    subCategory: "3 Piece",
-    price: 8990,
-    originalPrice: 11990,
-    discount: "25% OFF",
-    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80",
-    fabric: "Velvet & Chiffon",
-    pieces: "Shirt + Trouser + Embroidered Dupatta",
-    color: "Deep Emerald",
-    sku: "U3P-24-EMB-01",
-    isActive: true,
-    inStock: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: "un-2",
-    title: "2 Piece Printed Khaddar Suit",
-    category: "Unstitched",
-    subCategory: "2 Piece",
-    price: 3490,
-    originalPrice: 4290,
-    discount: "18% OFF",
-    image: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=800&q=80",
-    fabric: "Warm Khaddar",
-    pieces: "Shirt + Woolen Shawl",
-    color: "Mustard Gold",
-    sku: "U2P-24-KHD-09",
-    isActive: true,
-    inStock: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: "un-3",
-    title: "2 Piece Embroidered Karandi Suit",
-    category: "Unstitched",
-    subCategory: "2 Piece",
-    price: 4990,
-    originalPrice: 5990,
-    discount: "16% OFF",
-    image: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=800&q=80",
-    fabric: "Karandi",
-    pieces: "Shirt + Trouser",
-    color: "Ruby Red",
-    sku: "U2P-24-KRN-14",
-    isActive: true,
-    inStock: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: "un-4",
-    title: "1 Piece Printed Cambric Shirt",
-    category: "Unstitched",
-    subCategory: "1 Piece",
-    price: 1890,
-    originalPrice: 2290,
-    discount: "17% OFF",
-    image: "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?auto=format&fit=crop&w=800&q=80",
-    fabric: "Cambric Cotton",
-    pieces: "Unstitched Shirt Piece 3m",
-    color: "Powder Blue & White",
-    sku: "U1P-24-CAM-05",
-    isActive: true,
-    inStock: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: "rtw-1",
-    title: "2 Piece Printed Co-Ord Set",
-    category: "Ready To Wear",
-    subCategory: "Co-Ords",
-    price: 5490,
-    originalPrice: 6490,
-    discount: "15% OFF",
-    image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    fabric: "Linen Viscose Blend",
-    fit: "Relaxed Boxy Fit",
-    sizes: ["XS", "S", "M", "L", "XL"],
-    pieces: "Top + Bottom",
-    color: "Terracotta & Yellow",
-    sku: "RTW-24-CRD-01",
-    isActive: true,
-    inStock: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: "rtw-2",
-    title: "Embroidered Jacquard Kurti",
-    category: "Ready To Wear",
-    subCategory: "Pret Kurti",
-    price: 4290,
-    originalPrice: 4990,
-    discount: "14% OFF",
-    image: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=800&q=80",
-    fabric: "Woven Jacquard",
-    fit: "Straight Cut with Slits",
-    sizes: ["S", "M", "L"],
-    pieces: "Single Kurti",
-    color: "Sky Blue & Pastel",
-    sku: "RTW-24-JKR-02",
-    isActive: true,
-    inStock: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: "rtw-3",
-    title: "Solid Everyday Casual Kurta",
-    category: "Ready To Wear",
-    subCategory: "Pret Kurti",
-    price: 2990,
-    originalPrice: 3490,
-    discount: "14% OFF",
-    image: "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=800&q=80",
-    fabric: "Slub Cotton",
-    fit: "A-Line Flare",
-    sizes: ["XS", "S", "M", "L"],
-    pieces: "Everyday Kurti",
-    color: "Sage Green",
-    sku: "RTW-24-CSL-03",
-    isActive: true,
-    inStock: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: "rtw-4",
-    title: "3 Piece Festive Silk Ensemble",
-    category: "Ready To Wear",
-    subCategory: "3 Piece Pret",
-    price: 12990,
-    originalPrice: 15990,
-    discount: "18% OFF",
-    image: "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&w=800&q=80",
-    fabric: "Raw Silk & Organza",
-    fit: "Royal Anarkali Cut",
-    sizes: ["S", "M", "L"],
-    pieces: "Frock + Churidar + Organza Dupatta",
-    color: "Midnight Teal & Gold",
-    sku: "RTW-24-SLK-04",
-    isActive: true,
-    inStock: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+// Default Catalog Products Seed (Dynamic from catalog JSON)
+let DEFAULT_PRODUCTS = [];
+try {
+  if (fs.existsSync(PRODUCTS_FILE)) {
+    DEFAULT_PRODUCTS = JSON.parse(fs.readFileSync(PRODUCTS_FILE, 'utf-8'));
   }
-];
+} catch (e) {
+  DEFAULT_PRODUCTS = [];
+}
 
 // Helper: Read Products
 function readProducts() {
@@ -1746,9 +1601,25 @@ app.get('/api/products', async (req, res) => {
 });
 
 // GET /api/products/:id - Single product by ID
-app.get('/api/products/:id', (req, res) => {
+app.get('/api/products/:id', async (req, res) => {
+  const targetId = req.params.id;
+  if (isMongoConnected()) {
+    try {
+      const mongoFilter = {
+        $or: [
+          { id: targetId },
+          ...(mongoose.Types.ObjectId.isValid(targetId) ? [{ _id: targetId }] : [])
+        ]
+      };
+      const p = await Product.findOne(mongoFilter);
+      if (p) return res.json(p);
+    } catch (err) {
+      console.warn('MongoDB single product error:', err.message);
+    }
+  }
+
   const products = readProducts();
-  const product = products.find(p => p.id === req.params.id);
+  const product = products.find(p => p.id === targetId || p._id === targetId);
   if (!product) {
     return res.status(404).json({ error: 'Product not found' });
   }
@@ -1819,6 +1690,14 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
       updatedAt: new Date().toISOString()
     };
 
+    if (isMongoConnected()) {
+      try {
+        await Product.create(newProduct);
+      } catch (mongoErr) {
+        console.warn("MongoDB product create error:", mongoErr.message);
+      }
+    }
+
     products.unshift(newProduct);
     writeProducts(products);
     logActivity('Product Created', `Added product "${newProduct.title}" (Rs. ${newProduct.price.toLocaleString()})`);
@@ -1837,13 +1716,33 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
 // PUT /api/products/:id - Update existing product
 app.put('/api/products/:id', upload.single('image'), async (req, res) => {
   try {
+    const targetId = req.params.id;
     const products = readProducts();
-    const index = products.findIndex(p => p.id === req.params.id);
-    if (index === -1) {
+    const index = products.findIndex(p => p.id === targetId || p._id === targetId);
+
+    let existing = index !== -1 ? products[index] : null;
+
+    if (!existing && isMongoConnected()) {
+      try {
+        const filter = {
+          $or: [
+            { id: targetId },
+            ...(mongoose.Types.ObjectId.isValid(targetId) ? [{ _id: targetId }] : [])
+          ]
+        };
+        const doc = await Product.findOne(filter);
+        if (doc) {
+          existing = doc.toObject ? doc.toObject() : doc;
+        }
+      } catch (err) {
+        console.warn('MongoDB find error in PUT:', err.message);
+      }
+    }
+
+    if (!existing) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const existing = products[index];
     let imageUrl = existing.image;
 
     if (req.file) {
@@ -1901,8 +1800,28 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
       updatedAt: new Date().toISOString()
     };
 
-    products[index] = updated;
+    if (isMongoConnected()) {
+      try {
+        const updateFilter = {
+          $or: [
+            { id: targetId },
+            ...(mongoose.Types.ObjectId.isValid(targetId) ? [{ _id: targetId }] : [])
+          ]
+        };
+        await Product.updateOne(updateFilter, { $set: updated }, { upsert: true });
+        console.log(`[MongoDB] Updated product "${updated.title}" (ID: ${targetId})`);
+      } catch (mongoErr) {
+        console.error('Error updating product in MongoDB:', mongoErr);
+      }
+    }
+
+    if (index !== -1) {
+      products[index] = updated;
+    } else {
+      products.unshift(updated);
+    }
     writeProducts(products);
+
     logActivity('Product Updated', `Updated product "${updated.title}"`);
 
     res.json({
@@ -1917,33 +1836,69 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
 });
 
 // DELETE /api/products/:id - Delete a product
-app.delete('/api/products/:id', (req, res) => {
+app.delete('/api/products/:id', async (req, res) => {
   try {
-    const products = readProducts();
-    const index = products.findIndex(p => p.id === req.params.id);
-    if (index === -1) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
+    const targetId = req.params.id;
+    let found = false;
+    let deletedTitle = '';
 
-    const deleted = products[index];
-    if (deleted.image && deleted.image.startsWith('/uploads/')) {
-      const filename = path.basename(deleted.image);
-      if (filename !== 'user-limelight-banner.jpg') {
-        const filePath = path.join(UPLOADS_DIR, filename);
-        if (fs.existsSync(filePath)) {
-          try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
+    // 1. Delete from MongoDB Atlas
+    if (isMongoConnected()) {
+      try {
+        const mongoFilter = {
+          $or: [
+            { id: targetId },
+            ...(mongoose.Types.ObjectId.isValid(targetId) ? [{ _id: targetId }] : [])
+          ]
+        };
+        const existingInMongo = await Product.findOne(mongoFilter);
+        if (existingInMongo) {
+          found = true;
+          deletedTitle = existingInMongo.title || '';
+          await Product.deleteMany(mongoFilter);
+          console.log(`[MongoDB] Deleted product "${deletedTitle}" (ID: ${targetId})`);
         }
+      } catch (mongoErr) {
+        console.error('Error deleting product from MongoDB:', mongoErr);
       }
     }
 
-    products.splice(index, 1);
-    writeProducts(products);
-    logActivity('Product Deleted', `Removed product "${deleted.title}" (ID: ${req.params.id})`);
+    // 2. Delete from local JSON / in-memory
+    const products = readProducts();
+    const index = products.findIndex(p => p.id === targetId || p._id === targetId);
+    if (index !== -1) {
+      found = true;
+      const deleted = products[index];
+      if (!deletedTitle) deletedTitle = deleted.title;
+
+      if (deleted.image && deleted.image.startsWith('/uploads/')) {
+        const filename = path.basename(deleted.image);
+        if (filename !== 'user-limelight-banner.jpg') {
+          const filePath = path.join(UPLOADS_DIR, filename);
+          if (fs.existsSync(filePath)) {
+            try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
+          }
+        }
+      }
+
+      products.splice(index, 1);
+      try {
+        fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf-8');
+      } catch (err) {
+        console.error('Error writing products file on delete:', err);
+      }
+    }
+
+    if (!found) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    logActivity('Product Deleted', `Removed product "${deletedTitle || targetId}" (ID: ${targetId})`);
 
     res.json({
       success: true,
       message: 'Product deleted successfully',
-      id: req.params.id
+      id: targetId
     });
   } catch (error) {
     console.error('Error deleting product:', error);
@@ -1952,10 +1907,21 @@ app.delete('/api/products/:id', (req, res) => {
 });
 
 // POST /api/products/reset - Reset products to default
-app.post('/api/products/reset', (req, res) => {
-  writeProducts(DEFAULT_PRODUCTS);
-  logActivity('Products Reset', 'Reset product catalog to default Limelight items');
-  res.json({ success: true, message: 'Product catalog reset to defaults', products: DEFAULT_PRODUCTS });
+app.post('/api/products/reset', async (req, res) => {
+  try {
+    if (isMongoConnected()) {
+      await Product.deleteMany({});
+      if (DEFAULT_PRODUCTS.length > 0) {
+        await Product.insertMany(DEFAULT_PRODUCTS);
+      }
+    }
+    writeProducts(DEFAULT_PRODUCTS);
+    logActivity('Products Reset', 'Reset product catalog to default Limelight items');
+    res.json({ success: true, message: 'Product catalog reset to defaults', products: DEFAULT_PRODUCTS });
+  } catch (err) {
+    console.error('Error resetting products:', err);
+    res.status(500).json({ error: err.message || 'Failed to reset products' });
+  }
 });
 
 // ================= CURATED COLLECTIONS API ROUTES =================
@@ -2082,35 +2048,59 @@ app.put('/api/collections/:id', upload.single('image'), (req, res) => {
 });
 
 // DELETE /api/collections/:id - Delete collection
-app.delete('/api/collections/:id', (req, res) => {
+app.delete('/api/collections/:id', async (req, res) => {
   try {
-    const collections = readCollections();
-    const index = collections.findIndex(c => c.id === req.params.id);
-    if (index === -1) {
-      return res.status(404).json({ error: 'Collection not found' });
-    }
+    const targetId = req.params.id;
+    let found = false;
 
-    const deleted = collections[index];
-    if (deleted.image && deleted.image.startsWith('/uploads/')) {
-      const filename = path.basename(deleted.image);
-      const filePath = path.join(UPLOADS_DIR, filename);
-      if (fs.existsSync(filePath)) {
-        try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
+    if (isMongoConnected()) {
+      try {
+        const mongoFilter = {
+          $or: [
+            { id: targetId },
+            ...(mongoose.Types.ObjectId.isValid(targetId) ? [{ _id: targetId }] : [])
+          ]
+        };
+        await Collection.deleteMany(mongoFilter);
+        found = true;
+      } catch (mongoErr) {
+        console.error('Error deleting collection from MongoDB:', mongoErr);
       }
     }
 
-    collections.splice(index, 1);
-    writeCollections(collections);
-    logActivity('Collection Deleted', `Deleted collection "${deleted.title}"`);
+    const collections = readCollections();
+    const index = collections.findIndex(c => c.id === targetId || c._id === targetId);
+    if (index !== -1) {
+      found = true;
+      const deleted = collections[index];
+      if (deleted.image && deleted.image.startsWith('/uploads/')) {
+        const filename = path.basename(deleted.image);
+        const filePath = path.join(UPLOADS_DIR, filename);
+        if (fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
+        }
+      }
 
-    res.json({ success: true, message: 'Collection deleted successfully', id: req.params.id });
+      collections.splice(index, 1);
+      try {
+        fs.writeFileSync(COLLECTIONS_FILE, JSON.stringify(collections, null, 2), 'utf-8');
+      } catch (err) {
+        console.error('Error writing collections file:', err);
+      }
+      logActivity('Collection Deleted', `Deleted collection "${deleted.title}"`);
+    }
+
+    if (!found) {
+      return res.status(404).json({ error: 'Collection not found' });
+    }
+
+    res.json({ success: true, message: 'Collection deleted successfully', id: targetId });
   } catch (error) {
     console.error('Error deleting collection:', error);
     res.status(500).json({ error: error.message || 'Failed to delete collection' });
   }
 });
 
-// POST /api/collections/reset - Reset collections to defaults
 app.post('/api/collections/reset', (req, res) => {
   writeCollections(DEFAULT_COLLECTIONS);
   logActivity('Collections Reset', 'Reset curated collections to default Limelight items');
@@ -3333,43 +3323,62 @@ app.put('/api/slides/:id', upload.single('image'), (req, res) => {
 });
 
 // DELETE /api/slides/:id - Delete a slide
-app.delete('/api/slides/:id', (req, res) => {
+app.delete('/api/slides/:id', async (req, res) => {
   try {
-    const slides = readSlides();
-    const index = slides.findIndex(s => s.id === req.params.id);
-    if (index === -1) {
-      return res.status(404).json({ error: 'Slide not found' });
-    }
+    const targetId = req.params.id;
+    let found = false;
 
-    const deleted = slides[index];
-
-    // Remove local file if stored in /uploads/
-    if (deleted.imageUrl && deleted.imageUrl.startsWith('/uploads/')) {
-      const filename = path.basename(deleted.imageUrl);
-      if (filename !== 'user-limelight-banner.jpg') {
-        const filePath = path.join(UPLOADS_DIR, filename);
-        if (fs.existsSync(filePath)) {
-          try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
-        }
+    if (isMongoConnected()) {
+      try {
+        const mongoFilter = {
+          $or: [
+            { id: targetId },
+            ...(mongoose.Types.ObjectId.isValid(targetId) ? [{ _id: targetId }] : [])
+          ]
+        };
+        await Slide.deleteMany(mongoFilter);
+        found = true;
+      } catch (mongoErr) {
+        console.error('Error deleting slide from MongoDB:', mongoErr);
       }
     }
 
-    slides.splice(index, 1);
-    writeSlides(slides);
-    logActivity('Slide Deleted', `Removed slide "${deleted.title}" (ID: ${req.params.id})`);
+    const slides = readSlides();
+    const index = slides.findIndex(s => s.id === targetId || s._id === targetId);
+    if (index !== -1) {
+      found = true;
+      const deleted = slides[index];
 
-    res.json({
-      success: true,
-      message: 'Slide deleted successfully',
-      id: req.params.id
-    });
+      if (deleted.imageUrl && deleted.imageUrl.startsWith('/uploads/')) {
+        const filename = path.basename(deleted.imageUrl);
+        if (filename !== 'user-limelight-banner.jpg') {
+          const filePath = path.join(UPLOADS_DIR, filename);
+          if (fs.existsSync(filePath)) {
+            try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
+          }
+        }
+      }
+
+      slides.splice(index, 1);
+      try {
+        fs.writeFileSync(SLIDES_FILE, JSON.stringify(slides, null, 2), 'utf-8');
+      } catch (err) {
+        console.error('Error writing slides file:', err);
+      }
+      logActivity('Slide Deleted', `Removed hero carousel slide "${deleted.title}"`);
+    }
+
+    if (!found) {
+      return res.status(404).json({ error: 'Slide not found' });
+    }
+
+    res.json({ success: true, message: 'Slide deleted successfully', id: targetId });
   } catch (error) {
     console.error('Error deleting slide:', error);
     res.status(500).json({ error: error.message || 'Failed to delete slide' });
   }
 });
 
-// POST /api/slides/reorder - Reorder slides
 app.post('/api/slides/reorder', (req, res) => {
   try {
     const { orderIds } = req.body; // array of slide IDs in desired order
