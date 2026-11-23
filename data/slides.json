@@ -4,15 +4,15 @@
     "badge": "WINTER VOLUME 2026",
     "scriptText": "Signature",
     "title": "UNSTITCHED & READY TO WEAR",
-    "subtitle": "Discover rich textures, intricate embroideries, and statement silhouettes tailored for the contemporary winter wardrobe. STYLE FOR EVERY OCCASION.",
+    "subtitle": "Discover rich textures, intricate embroideries, and statement silhouettes tailored for the contemporary winter wardrobe.",
     "primaryBtnText": "SHOP UNSTITCHED",
     "primaryBtnLink": "#unstitched",
     "secondaryBtnText": "VIEW READY TO WEAR",
     "secondaryBtnLink": "#ready-to-wear",
-    "imageUrl": "https://www.limelight.pk/cdn/shop/files/BANNERS_FOR_WEB_jpg_ff_jpg.jpg?v=1789713515&width=1920",
-    "order": 2,
+    "imageUrl": "https://res.cloudinary.com/antxd4tm/image/upload/v1795468254/limelight/products/wxmrzxlgmlg2tetiiguu.jpg",
     "isActive": true,
-    "createdAt": "2026-11-15T19:26:43.889Z"
+    "order": 1,
+    "_id": "6b04af74291f4895ff4d08b1"
   },
   {
     "id": "slide-2",
@@ -24,10 +24,10 @@
     "primaryBtnLink": "#unstitched",
     "secondaryBtnText": "SHOP 3-PIECE SUITS",
     "secondaryBtnLink": "#unstitched",
-    "imageUrl": "https://www.limelight.pk/cdn/shop/files/unstitched_jpg.jpg?v=1789646203&width=1920",
-    "order": 1,
+    "imageUrl": "https://res.cloudinary.com/antxd4tm/image/upload/v1795468256/limelight/products/vjsl0kwf5brmmt39d5qu.jpg",
     "isActive": true,
-    "createdAt": "2026-11-15T19:26:43.890Z"
+    "order": 2,
+    "_id": "6b04af74291f4895ff4d08b2"
   },
   {
     "id": "slide-3",
@@ -39,39 +39,24 @@
     "primaryBtnLink": "#ready-to-wear",
     "secondaryBtnText": "VIEW PRET LOOKS",
     "secondaryBtnLink": "#ready-to-wear",
-    "imageUrl": "https://www.limelight.pk/cdn/shop/files/coords_jpg.jpg?v=1789646276&width=1920",
-    "order": 3,
+    "imageUrl": "https://res.cloudinary.com/antxd4tm/image/upload/v1795468257/limelight/products/cwygrr1yik37o2gpohnb.jpg",
     "isActive": true,
-    "createdAt": "2026-11-15T19:26:43.890Z"
+    "order": 3,
+    "_id": "6b04af74291f4895ff4d08b3"
   },
   {
     "id": "slide-4",
-    "badge": "SIGNATURE COUTURE",
-    "scriptText": "Festive",
+    "badge": "READY TO WEAR",
+    "scriptText": "Contemporary",
     "title": "READY TO WEAR LUXE PRET",
-    "subtitle": "Intricate metallic embroideries and royal cuts designed for winter weddings and evening festivities.",
-    "primaryBtnText": "SHOP FESTIVE",
+    "subtitle": "Modern everyday kurtas and stitched luxury pret ensembles designed for festive occasions.",
+    "primaryBtnText": "EXPLORE PRET",
     "primaryBtnLink": "#ready-to-wear",
-    "secondaryBtnText": "DISCOVER MORE",
-    "secondaryBtnLink": "#collections",
-    "imageUrl": "https://www.limelight.pk/cdn/shop/files/Web_RTW_Main.jpg?v=1778494519",
+    "secondaryBtnText": "NEW ARRIVALS",
+    "secondaryBtnLink": "#new-arrivals",
+    "imageUrl": "https://res.cloudinary.com/antxd4tm/image/upload/v1795468259/limelight/products/hm2htjcsqo4ia2g0cv0b.jpg",
+    "isActive": true,
     "order": 4,
-    "isActive": true,
-    "createdAt": "2026-11-15T19:26:43.890Z"
-  },
-  {
-    "id": "slide-1794771445273-175",
-    "badge": "ali zohaib",
-    "scriptText": "Signature",
-    "title": "zohaib testing",
-    "subtitle": "hello je \r\n",
-    "primaryBtnText": "SHOP UNSTITCHED",
-    "primaryBtnLink": "#unstitched",
-    "secondaryBtnText": "VIEW READY TO WEAR",
-    "secondaryBtnLink": "#ready-to-wear",
-    "imageUrl": "/uploads/slide-college-1794771445264-814812480.jpg",
-    "order": 6,
-    "isActive": true,
-    "createdAt": "2026-11-15T19:37:25.273Z"
+    "_id": "6b04af74291f4895ff4d08b4"
   }
 ]
