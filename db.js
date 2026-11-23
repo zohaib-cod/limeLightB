@@ -28,7 +28,7 @@ let isConnected = false;
 
 // Connect to MongoDB Atlas
 export async function connectMongo() {
-  const uri = process.env.MONGODB_URI;
+  const uri = process.env.MONGODB_URI || 'mongodb+srv://alizohaibweb_db_user:mkkfcJKthk1VfMWY@cluster0.hgi0zh6.mongodb.net/limelight?retryWrites=true&w=majority&appName=Cluster0';
   if (!uri) {
     console.warn('⚠️ MONGODB_URI not set. Running in local JSON storage mode.');
     return false;

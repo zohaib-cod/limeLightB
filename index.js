@@ -169,6 +169,16 @@ app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Auto-connect to MongoDB if disconnected
+app.use(async (req, res, next) => {
+  if (!isMongoConnected()) {
+    try {
+      await connectMongo();
+    } catch (err) {}
+  }
+  next();
+});
+
 // Serve uploaded static files
 app.use('/uploads', express.static(UPLOADS_DIR));
 
@@ -1698,9 +1708,28 @@ app.post('/api/banners/reset', (req, res) => {
 // ================= PRODUCTS API ROUTES =================
 
 // GET /api/products - Get all products with optional category & active filters
-app.get('/api/products', (req, res) => {
+app.get('/api/products', async (req, res) => {
   const includeInactive = req.query.all === 'true' || req.query.admin === 'true';
   const categoryFilter = req.query.category;
+
+  if (isMongoConnected()) {
+    try {
+      const query = {};
+      if (!includeInactive) {
+        query.isActive = { $ne: false };
+      }
+      if (categoryFilter && categoryFilter.toLowerCase() !== 'all') {
+        query.category = new RegExp(`^${categoryFilter}$`, 'i');
+      }
+      const mongoProducts = await Product.find(query).sort({ createdAt: -1 });
+      if (mongoProducts && mongoProducts.length > 0) {
+        return res.json(mongoProducts);
+      }
+    } catch (err) {
+      console.warn('MongoDB query error, falling back to JSON:', err.message);
+    }
+  }
+
   let products = readProducts();
 
   if (!includeInactive) {
@@ -2119,9 +2148,28 @@ app.post('/api/collections/reorder', (req, res) => {
 // ================= NEW ARRIVALS API ROUTES =================
 
 // GET /api/new-arrivals - Return all new arrivals
-app.get('/api/new-arrivals', (req, res) => {
+app.get('/api/new-arrivals', async (req, res) => {
   const includeInactive = req.query.all === 'true' || req.query.admin === 'true';
   const category = req.query.category;
+
+  if (isMongoConnected()) {
+    try {
+      const query = {};
+      if (!includeInactive) {
+        query.isActive = { $ne: false };
+      }
+      if (category && category.toUpperCase() !== 'ALL') {
+        query.category = new RegExp(category, 'i');
+      }
+      const mongoItems = await NewArrival.find(query).sort({ order: 1 });
+      if (mongoItems && mongoItems.length > 0) {
+        return res.json(mongoItems);
+      }
+    } catch (err) {
+      console.warn('MongoDB new-arrivals query error:', err.message);
+    }
+  }
+
   const items = readNewArrivals();
   let filtered = includeInactive ? items : items.filter(i => i.isActive !== false);
 
@@ -3404,4 +3452,6 @@ app.listen(PORT, '0.0.0.0', async () => {
     console.error('Initial MongoDB connection error:', err.message);
   }
 });
+
+export default app;
 
