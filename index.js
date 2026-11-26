@@ -939,19 +939,6 @@ readSections();
 readFooter();
 readSubscribers();
 
-// Copy user's uploaded banner to uploads folder if exists
-const uploadedBannerSrc = '/home/ali-zohaib/.gemini/antigravity/brain/059c8a30-7dc8-4769-96e8-c22e8c0cdbec/.user_uploaded/media_1794770709329_49e4ea5c.jpg';
-if (fs.existsSync(uploadedBannerSrc)) {
-  const destPath = path.join(UPLOADS_DIR, 'user-limelight-banner.jpg');
-  if (!fs.existsSync(destPath)) {
-    try {
-      fs.copyFileSync(uploadedBannerSrc, destPath);
-    } catch (e) {
-      console.warn('Could not copy user image:', e.message);
-    }
-  }
-}
-
 // ================= API ROUTES =================
 
 // Health check & System Stats
@@ -1012,8 +999,8 @@ app.get('/api/stats', async (req, res) => {
     activeUsers,
     totalRoutes: navigation.length,
     totalSubscribers: subscribers.length,
-    whatsappNumber: settings.whatsappNumber || "+92 345 7867016",
-    categoriesCount: 6,
+    whatsappNumber: settings.whatsappNumber || "",
+    categoriesCount: new Set(products.map(p => (p.category || '').trim().toLowerCase()).filter(Boolean)).size,
     freeShippingThreshold: 2490,
     serverUptime: Math.round(process.uptime()),
     nodeVersion: process.version,
