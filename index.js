@@ -48,27 +48,59 @@ async function processUploadedImage(reqFile, folder = 'limelight') {
   return `/uploads/${reqFile.filename}`;
 }
 
-// Background MongoDB Dual-Write Helper
+// Background & Awaited MongoDB Helpers
+function buildIdFilter(targetId, extraFields = []) {
+  const clauses = [{ id: targetId }, ...extraFields.map(f => ({ [f]: targetId }))];
+  if (mongoose.Types.ObjectId.isValid(targetId)) {
+    clauses.push({ _id: targetId });
+  }
+  return { $or: clauses };
+}
+
+function stripMongoMeta(doc) {
+  if (!doc || typeof doc !== 'object') return doc;
+  const { _id, __v, ...rest } = doc;
+  return rest;
+}
+
 async function syncCollectionToMongo(Model, data, isArray = true) {
   if (!isMongoConnected()) return;
   try {
     if (isArray && Array.isArray(data)) {
-      const ops = data.map(item => ({
-        updateOne: {
-          filter: { id: item.id },
-          update: { $set: item },
-          upsert: true
-        }
-      }));
+      const ops = data.map(item => {
+        const clean = stripMongoMeta(item);
+        return {
+          updateOne: {
+            filter: { id: clean.id },
+            update: { $set: clean },
+            upsert: true
+          }
+        };
+      });
       if (ops.length > 0) {
         await Model.bulkWrite(ops, { ordered: false });
       }
     } else if (data) {
-      await Model.updateOne({ key: 'site_settings' }, { $set: data }, { upsert: true });
+      await Model.updateOne({ key: 'site_settings' }, { $set: stripMongoMeta(data) }, { upsert: true });
     }
   } catch (err) {
     console.warn(`MongoDB sync error (${Model.modelName}):`, err.message);
   }
+}
+
+async function readCollectionWithMongoFallback(Model, readLocalFn, sortObj = null) {
+  if (isMongoConnected()) {
+    try {
+      const query = Model.find({}).lean();
+      const docs = sortObj ? await query.sort(sortObj) : await query;
+      if (Array.isArray(docs)) {
+        return docs;
+      }
+    } catch (err) {
+      console.warn(`MongoDB read error (${Model.modelName}):`, err.message);
+    }
+  }
+  return readLocalFn();
 }
 
 // Directories
@@ -183,69 +215,15 @@ app.use(async (req, res, next) => {
 // Serve uploaded static files
 app.use('/uploads', express.static(UPLOADS_DIR));
 
-// Default Slides Seed
-const DEFAULT_SLIDES = [
-  {
-    id: "slide-1",
-    badge: "WINTER VOLUME 2026",
-    scriptText: "Signature",
-    title: "UNSTITCHED & READY TO WEAR",
-    subtitle: "Discover rich textures, intricate embroideries, and statement silhouettes tailored for the contemporary winter wardrobe. STYLE FOR EVERY OCCASION.",
-    primaryBtnText: "SHOP UNSTITCHED",
-    primaryBtnLink: "#unstitched",
-    secondaryBtnText: "VIEW READY TO WEAR",
-    secondaryBtnLink: "#ready-to-wear",
-    imageUrl: "https://www.limelight.pk/cdn/shop/files/BANNERS_FOR_WEB_jpg_ff_jpg.jpg?v=1789713515&width=1920",
-    order: 1,
-    isActive: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "slide-2",
-    badge: "LUXURY UNSTITCHED",
-    scriptText: "Elegance",
-    title: "EMBROIDERED WINTER VELVET",
-    subtitle: "Exquisite zari and threadwork on micro velvet paired with printed pashmina and karandi shawls.",
-    primaryBtnText: "EXPLORE VELVET",
-    primaryBtnLink: "#unstitched",
-    secondaryBtnText: "SHOP 3-PIECE SUITS",
-    secondaryBtnLink: "#unstitched",
-    imageUrl: "https://www.limelight.pk/cdn/shop/files/unstitched_jpg.jpg?v=1789646203&width=1920",
-    order: 2,
-    isActive: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "slide-3",
-    badge: "WESTERN & PRET",
-    scriptText: "Chic",
-    title: "CO-ORD SETS & CASUALS",
-    subtitle: "Effortless day-to-evening style crafted in premium linen blends and structured slub fabrics.",
-    primaryBtnText: "SHOP CO-ORDS",
-    primaryBtnLink: "#ready-to-wear",
-    secondaryBtnText: "VIEW PRET LOOKS",
-    secondaryBtnLink: "#ready-to-wear",
-    imageUrl: "https://www.limelight.pk/cdn/shop/files/coords_jpg.jpg?v=1789646276&width=1920",
-    order: 3,
-    isActive: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "slide-4",
-    badge: "SIGNATURE COUTURE",
-    scriptText: "Festive",
-    title: "READY TO WEAR LUXE PRET",
-    subtitle: "Intricate metallic embroideries and royal cuts designed for winter weddings and evening festivities.",
-    primaryBtnText: "SHOP FESTIVE",
-    primaryBtnLink: "#ready-to-wear",
-    secondaryBtnText: "DISCOVER MORE",
-    secondaryBtnLink: "#collections",
-    imageUrl: "https://www.limelight.pk/cdn/shop/files/Web_RTW_Main.jpg?v=1778494519",
-    order: 4,
-    isActive: true,
-    createdAt: new Date().toISOString()
+// Default Slides Seed (Dynamic from slides.json)
+let DEFAULT_SLIDES = [];
+try {
+  if (fs.existsSync(SLIDES_FILE)) {
+    DEFAULT_SLIDES = JSON.parse(fs.readFileSync(SLIDES_FILE, 'utf-8')).map(({ _id, __v, ...rest }) => rest);
   }
-];
+} catch (e) {
+  DEFAULT_SLIDES = [];
+}
 
 // Helper: Read Slides
 function readSlides() {
@@ -343,79 +321,15 @@ function writeFeatures(features) {
   }
 }
 
-// Default Section Editorial Banners
-const DEFAULT_BANNERS = [
-  {
-    id: "unstitched",
-    section: "unstitched",
-    sectionName: "Unstitched Fabrics Section",
-    badge: "LUXURY WINTER EDIT",
-    watermark: "UNSTITCHED",
-    title: "UNSTITCHED FABRICS",
-    subtitle: "Tailor your distinctive look with our finest unstitched velvets, warm karandi, and embroidered khaddar fabrics.",
-    scriptText: "Style it your way.",
-    buttonText: "EXPLORE DESIGNS",
-    buttonLink: "#unstitched-grid",
-    imageUrl: "https://www.limelight.pk/cdn/shop/files/unstitched_jpg.jpg?v=1789646203&width=1920",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: "unstitched-wide",
-    section: "unstitched-wide",
-    sectionName: "Unstitched Embroidered Shawls & Suits (Wide Banner)",
-    badge: "EMBROIDERED EMBELLISHMENTS",
-    watermark: "UNSTITCHED EMBROIDERED",
-    title: "SIGNATURE WINTER SHAWLS & SUITS",
-    subtitle: "",
-    scriptText: "",
-    buttonText: "VIEW FULL COLLECTION",
-    buttonLink: "#unstitched",
-    secondaryBtnText: "SHOP NOW",
-    secondaryBtnLink: "#unstitched",
-    imageUrl: "https://www.limelight.pk/cdn/shop/files/Unstitched_Embroidered_1425_x_445.jpg?v=1778751852",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: "rtw-pret",
-    section: "rtw-pret",
-    sectionName: "RTW: Daily Chic & Kurtis",
-    badge: "PRET CASUALS",
-    watermark: "Ready to",
-    title: "DAILY CHIC & KURTIS",
-    subtitle: "",
-    scriptText: "",
-    buttonText: "SHOP PRET CASUALS →",
-    buttonLink: "#rtw-grid",
-    secondaryBtnText: "SHOP NOW",
-    secondaryBtnLink: "#rtw-grid",
-    imageUrl: "https://www.limelight.pk/cdn/shop/files/Web_RTW_Main.jpg?v=1778494519",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: "rtw-coords",
-    section: "rtw-coords",
-    sectionName: "RTW: Western Co-Ords",
-    badge: "MODERN SILHOUETTES",
-    watermark: "CO-ORDS",
-    title: "WESTERN CO-ORDS",
-    subtitle: "MADE TO MATCH",
-    scriptText: "",
-    buttonText: "DISCOVER CO-ORDS →",
-    buttonLink: "#rtw-grid",
-    secondaryBtnText: "",
-    secondaryBtnLink: "",
-    imageUrl: "https://www.limelight.pk/cdn/shop/files/coords_jpg.jpg?v=1789646276&width=1920",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+// Default Section Editorial Banners (Dynamic from banners.json)
+let DEFAULT_BANNERS = [];
+try {
+  if (fs.existsSync(BANNERS_FILE)) {
+    DEFAULT_BANNERS = JSON.parse(fs.readFileSync(BANNERS_FILE, 'utf-8')).map(({ _id, __v, ...rest }) => rest);
   }
-];
+} catch (e) {
+  DEFAULT_BANNERS = [];
+}
 
 // Helper: Read Banners
 function readBanners() {
@@ -487,61 +401,15 @@ function writeProducts(products) {
   }
 }
 
-// Default Seed Curated Collections
-const DEFAULT_COLLECTIONS = [
-  {
-    id: "col-1",
-    title: "WINTER VELVET",
-    tagline: "Regal textures & opulent hues",
-    image: "https://images.unsplash.com/photo-1566737236500-c8ac43014a67?auto=format&fit=crop&w=800&q=80",
-    count: "48 Designs",
-    linkText: "EXPLORE VELVET",
-    linkUrl: "#unstitched",
-    isActive: true,
-    order: 1,
-    createdAt: "2026-11-15T20:40:00.000Z",
-    updatedAt: "2026-11-15T20:40:00.000Z"
-  },
-  {
-    id: "col-2",
-    title: "CO-ORD SETS",
-    tagline: "Effortless modern silhouettes",
-    image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=800&q=80",
-    count: "32 Sets",
-    linkText: "SHOP CO-ORDS",
-    linkUrl: "#ready-to-wear",
-    isActive: true,
-    order: 2,
-    createdAt: "2026-11-15T20:40:00.000Z",
-    updatedAt: "2026-11-15T20:40:00.000Z"
-  },
-  {
-    id: "col-3",
-    title: "EMBROIDERED ORGANZA",
-    tagline: "Intricate metallic thread embroidery",
-    image: "https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=80",
-    count: "24 Luxury Suits",
-    linkText: "VIEW FESTIVE",
-    linkUrl: "#unstitched",
-    isActive: true,
-    order: 3,
-    createdAt: "2026-11-15T20:40:00.000Z",
-    updatedAt: "2026-11-15T20:40:00.000Z"
-  },
-  {
-    id: "col-4",
-    title: "WARM KHADDAR & KARANDI",
-    tagline: "Timeless warmth for winter days",
-    image: "https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&w=800&q=80",
-    count: "65 Articles",
-    linkText: "SHOP KHADDAR",
-    linkUrl: "#unstitched",
-    isActive: true,
-    order: 4,
-    createdAt: "2026-11-15T20:40:00.000Z",
-    updatedAt: "2026-11-15T20:40:00.000Z"
+// Default Seed Curated Collections (Dynamic from collections.json)
+let DEFAULT_COLLECTIONS = [];
+try {
+  if (fs.existsSync(COLLECTIONS_FILE)) {
+    DEFAULT_COLLECTIONS = JSON.parse(fs.readFileSync(COLLECTIONS_FILE, 'utf-8')).map(({ _id, __v, ...rest }) => rest);
   }
-];
+} catch (e) {
+  DEFAULT_COLLECTIONS = [];
+}
 
 // Helper: Read Collections
 function readCollections() {
@@ -573,73 +441,15 @@ function writeCollections(collections) {
   }
 }
 
-// Default Seed New Arrivals
-const DEFAULT_NEW_ARRIVALS = [
-  {
-    id: "na-1",
-    title: "Embroidered Velvet Shawl 3 Piece Suit",
-    category: "Unstitched",
-    price: 9990,
-    originalPrice: 12990,
-    discount: "23% OFF",
-    badge: "JUST ARRIVED",
-    image: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=800&q=80",
-    fabric: "Premium Micro Velvet with Golden Zari Work",
-    sku: "NA-VLV-301",
-    isActive: true,
-    inStock: true,
-    createdAt: "2026-11-15T20:50:00.000Z",
-    updatedAt: "2026-11-15T20:50:00.000Z"
-  },
-  {
-    id: "na-2",
-    title: "Contemporary Minimalist Co-Ord Set",
-    category: "Ready To Wear",
-    price: 5990,
-    originalPrice: 6990,
-    discount: "14% OFF",
-    badge: "TRENDING",
-    image: "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=800&q=80",
-    fabric: "Super Fine Slub Twill",
-    sku: "NA-CRD-104",
-    isActive: true,
-    inStock: true,
-    createdAt: "2026-11-15T20:50:00.000Z",
-    updatedAt: "2026-11-15T20:50:00.000Z"
-  },
-  {
-    id: "na-3",
-    title: "Festive Raw Silk Jacquard Kurti",
-    category: "Ready To Wear",
-    price: 4690,
-    originalPrice: 5490,
-    discount: "15% OFF",
-    badge: "NEW IN",
-    image: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=800&q=80",
-    fabric: "Self Weave Jacquard",
-    sku: "NA-JAC-202",
-    isActive: true,
-    inStock: true,
-    createdAt: "2026-11-15T20:50:00.000Z",
-    updatedAt: "2026-11-15T20:50:00.000Z"
-  },
-  {
-    id: "na-4",
-    title: "Laser-Cut Festive Evening Clutch",
-    category: "Accessories",
-    price: 3290,
-    originalPrice: 3890,
-    discount: "15% OFF",
-    badge: "SELLING FAST",
-    image: "https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?auto=format&fit=crop&w=800&q=80",
-    fabric: "Faux Suede with Metal Clasp",
-    sku: "NA-BAG-508",
-    isActive: true,
-    inStock: true,
-    createdAt: "2026-11-15T20:50:00.000Z",
-    updatedAt: "2026-11-15T20:50:00.000Z"
+// Default Seed New Arrivals (Dynamic from new-arrivals.json)
+let DEFAULT_NEW_ARRIVALS = [];
+try {
+  if (fs.existsSync(NEW_ARRIVALS_FILE)) {
+    DEFAULT_NEW_ARRIVALS = JSON.parse(fs.readFileSync(NEW_ARRIVALS_FILE, 'utf-8')).map(({ _id, __v, ...rest }) => rest);
   }
-];
+} catch (e) {
+  DEFAULT_NEW_ARRIVALS = [];
+}
 
 // Helper: Read New Arrivals
 function readNewArrivals() {
@@ -672,39 +482,7 @@ function writeNewArrivals(items) {
 }
 
 // Default Sample Orders
-const DEFAULT_ORDERS = [
-  {
-    id: "LM-849201",
-    createdAt: "2026-11-15T21:00:00.000Z",
-    customer: {
-      name: "Ayesha Khan",
-      phone: "0300-8472910",
-      email: "ayesha.khan@example.com",
-      address: "House 42, Block C, Phase 5, DHA",
-      city: "Lahore",
-      province: "Punjab",
-      notes: "Please call before delivery"
-    },
-    items: [
-      {
-        id: "un-1",
-        title: "3 Piece Embroidered Velvet Suit",
-        category: "Unstitched",
-        price: 8990,
-        quantity: 1,
-        selectedSize: null,
-        fabric: "Velvet & Chiffon",
-        image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80"
-      }
-    ],
-    subtotal: 8990,
-    shipping: 0,
-    total: 8990,
-    paymentMethod: "Cash on Delivery",
-    status: "Pending",
-    source: "Storefront Direct Order"
-  }
-];
+const DEFAULT_ORDERS = [];
 
 // Helper: Read Orders
 function readOrders() {
@@ -1182,24 +960,34 @@ app.get('/api/health', (req, res) => {
 });
 
 // GET /api/stats - Dashboard analytics & overview
-app.get('/api/stats', (req, res) => {
-  const slides = readSlides();
+app.get('/api/stats', async (req, res) => {
+  const [slides, features, banners, products, collections, newArrivals, orders, users, navigation, subscribers, settingsDoc] = await Promise.all([
+    readCollectionWithMongoFallback(Slide, readSlides),
+    readCollectionWithMongoFallback(Feature, readFeatures),
+    readCollectionWithMongoFallback(Banner, readBanners),
+    readCollectionWithMongoFallback(Product, readProducts),
+    readCollectionWithMongoFallback(Collection, readCollections),
+    readCollectionWithMongoFallback(NewArrival, readNewArrivals),
+    readCollectionWithMongoFallback(Order, readOrders),
+    readCollectionWithMongoFallback(User, readUsers),
+    readCollectionWithMongoFallback(Navigation, readNavigation),
+    readCollectionWithMongoFallback(Subscriber, readSubscribers),
+    isMongoConnected()
+      ? Setting.findOne({ key: 'site_settings' }).lean().catch(() => readSettings())
+      : Promise.resolve(readSettings())
+  ]);
+
   const activeSlides = slides.filter(s => s.isActive !== false);
-  const features = readFeatures();
   const activeFeatures = features.filter(f => f.isActive !== false);
-  const banners = readBanners();
   const activeBanners = banners.filter(b => b.isActive !== false);
-  const products = readProducts();
   const activeProducts = products.filter(p => p.isActive !== false);
-  const collections = readCollections();
   const activeCollections = collections.filter(c => c.isActive !== false);
-  const newArrivals = readNewArrivals();
   const activeNewArrivals = newArrivals.filter(n => n.isActive !== false);
-  const orders = readOrders();
   const pendingOrders = orders.filter(o => o.status === 'Pending').length;
   const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
-  const users = readUsers();
   const activeUsers = users.filter(u => u.status === 'Active').length;
+  const settings = settingsDoc || readSettings();
+
   res.json({
     totalSlides: slides.length,
     activeSlides: activeSlides.length,
@@ -1212,6 +1000,7 @@ app.get('/api/stats', (req, res) => {
     activeProducts: activeProducts.length,
     unstitchedCount: products.filter(p => p.category?.toLowerCase() === 'unstitched').length,
     rtwCount: products.filter(p => p.category?.toLowerCase() === 'ready to wear').length,
+    menCount: products.filter(p => p.category?.toLowerCase() === 'men').length,
     totalCollections: collections.length,
     activeCollections: activeCollections.length,
     totalNewArrivals: newArrivals.length,
@@ -1221,14 +1010,14 @@ app.get('/api/stats', (req, res) => {
     totalRevenue,
     totalUsers: users.length,
     activeUsers,
-    totalRoutes: readNavigation().length,
-    totalSubscribers: readSubscribers().length,
-    whatsappNumber: readSettings().whatsappNumber || "+92 345 7867016",
+    totalRoutes: navigation.length,
+    totalSubscribers: subscribers.length,
+    whatsappNumber: settings.whatsappNumber || "+92 345 7867016",
     categoriesCount: 6,
     freeShippingThreshold: 2490,
     serverUptime: Math.round(process.uptime()),
     nodeVersion: process.version,
-    storageEngine: 'Local Persistent JSON + Multer Media Engine',
+    storageEngine: isMongoConnected() ? 'MongoDB Atlas + Cloudinary CDN' : 'Local Persistent JSON + Multer',
     uploadsCount: fs.existsSync(UPLOADS_DIR) ? fs.readdirSync(UPLOADS_DIR).length : 0
   });
 });
@@ -1236,33 +1025,39 @@ app.get('/api/stats', (req, res) => {
 // ================= FEATURES API ROUTES =================
 
 // GET /api/features - Return all features sorted by order
-app.get('/api/features', (req, res) => {
+app.get('/api/features', async (req, res) => {
   const includeInactive = req.query.all === 'true' || req.query.admin === 'true';
-  const features = readFeatures();
+  const features = await readCollectionWithMongoFallback(Feature, readFeatures, { order: 1 });
   const filtered = includeInactive ? features : features.filter(f => f.isActive !== false);
   filtered.sort((a, b) => (a.order || 0) - (b.order || 0));
   res.json(filtered);
 });
 
 // GET /api/features/:id - Single feature
-app.get('/api/features/:id', (req, res) => {
-  const features = readFeatures();
-  const item = features.find(f => f.id === req.params.id);
-  if (!item) {
-    return res.status(404).json({ error: 'Feature not found' });
+app.get('/api/features/:id', async (req, res) => {
+  const targetId = req.params.id;
+  if (isMongoConnected()) {
+    try {
+      const item = await Feature.findOne(buildIdFilter(targetId)).lean();
+      if (item) return res.json(item);
+      return res.status(404).json({ error: 'Feature not found' });
+    } catch (err) {}
   }
+  const features = readFeatures();
+  const item = features.find(f => f.id === targetId);
+  if (!item) return res.status(404).json({ error: 'Feature not found' });
   res.json(item);
 });
 
 // POST /api/features - Add new feature highlight
-app.post('/api/features', (req, res) => {
+app.post('/api/features', async (req, res) => {
   try {
     const { title, subtitle, isActive } = req.body;
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'Feature title is required' });
     }
 
-    const features = readFeatures();
+    const features = await readCollectionWithMongoFallback(Feature, readFeatures);
     const newFeature = {
       id: `feat-${Date.now()}-${Math.round(Math.random() * 1000)}`,
       title: title.trim(),
@@ -1272,15 +1067,12 @@ app.post('/api/features', (req, res) => {
       createdAt: new Date().toISOString()
     };
 
+    await upsertMongoDoc(Feature, { id: newFeature.id }, newFeature);
     features.push(newFeature);
-    writeFeatures(features);
+    try { fs.writeFileSync(FEATURES_FILE, JSON.stringify(features.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
     logActivity('Feature Created', `Added feature highlight "${newFeature.title}"`);
 
-    res.status(201).json({
-      success: true,
-      message: 'Feature created successfully',
-      feature: newFeature
-    });
+    res.status(201).json({ success: true, message: 'Feature created successfully', feature: newFeature });
   } catch (error) {
     console.error('Error creating feature:', error);
     res.status(500).json({ error: error.message || 'Failed to create feature' });
@@ -1288,499 +1080,15 @@ app.post('/api/features', (req, res) => {
 });
 
 // PUT /api/features/:id - Update existing feature highlight
-app.put('/api/features/:id', (req, res) => {
-  try {
-    const features = readFeatures();
-    const index = features.findIndex(f => f.id === req.params.id);
-    if (index === -1) {
-      return res.status(404).json({ error: 'Feature not found' });
-    }
-
-    const existing = features[index];
-    const updated = {
-      ...existing,
-      title: req.body.title !== undefined ? req.body.title.trim() : existing.title,
-      subtitle: req.body.subtitle !== undefined ? req.body.subtitle.trim() : existing.subtitle,
-      order: req.body.order !== undefined ? parseInt(req.body.order, 10) : existing.order,
-      isActive: req.body.isActive !== undefined ? (req.body.isActive === 'true' || req.body.isActive === true) : existing.isActive,
-      updatedAt: new Date().toISOString()
-    };
-
-    features[index] = updated;
-    writeFeatures(features);
-    logActivity('Feature Updated', `Updated feature highlight "${updated.title}"`);
-
-    res.json({
-      success: true,
-      message: 'Feature updated successfully',
-      feature: updated
-    });
-  } catch (error) {
-    console.error('Error updating feature:', error);
-    res.status(500).json({ error: error.message || 'Failed to update feature' });
-  }
-});
-
-// DELETE /api/features/:id - Delete a feature highlight
-app.delete('/api/features/:id', (req, res) => {
-  try {
-    const features = readFeatures();
-    const index = features.findIndex(f => f.id === req.params.id);
-    if (index === -1) {
-      return res.status(404).json({ error: 'Feature not found' });
-    }
-
-    const deleted = features[index];
-    features.splice(index, 1);
-    writeFeatures(features);
-    logActivity('Feature Deleted', `Deleted feature "${deleted.title}" (ID: ${req.params.id})`);
-
-    res.json({
-      success: true,
-      message: 'Feature deleted successfully',
-      id: req.params.id
-    });
-  } catch (error) {
-    console.error('Error deleting feature:', error);
-    res.status(500).json({ error: error.message || 'Failed to delete feature' });
-  }
-});
-
-// POST /api/features/reorder - Reorder feature highlights
-app.post('/api/features/reorder', (req, res) => {
-  try {
-    const { orderIds } = req.body;
-    if (!Array.isArray(orderIds)) {
-      return res.status(400).json({ error: 'orderIds must be an array of feature IDs' });
-    }
-
-    const features = readFeatures();
-    features.forEach(feat => {
-      const newOrder = orderIds.indexOf(feat.id);
-      if (newOrder !== -1) {
-        feat.order = newOrder + 1;
-      }
-    });
-
-    writeFeatures(features);
-    logActivity('Features Reordered', `Reordered ${orderIds.length} feature highlights`);
-    res.json({ success: true, message: 'Features reordered successfully', features });
-  } catch (error) {
-    console.error('Error reordering features:', error);
-    res.status(500).json({ error: error.message || 'Failed to reorder features' });
-  }
-});
-
-// POST /api/features/reset - Reset features to default
-app.post('/api/features/reset', (req, res) => {
-  writeFeatures(DEFAULT_FEATURES);
-  logActivity('Features Reset', 'Reset features bar to default Limelight values');
-  res.json({ success: true, message: 'Features reset to defaults', features: DEFAULT_FEATURES });
-});
-
-// ================= BANNERS API ROUTES =================
-
-// GET /api/banners - Return all section editorial banners
-app.get('/api/banners', (req, res) => {
-  const includeInactive = req.query.all === 'true' || req.query.admin === 'true';
-  const banners = readBanners();
-  const filtered = includeInactive ? banners : banners.filter(b => b.isActive !== false);
-  res.json(filtered);
-});
-
-// GET /api/banners/:id - Single section banner by id or section name
-app.get('/api/banners/:id', (req, res) => {
-  const banners = readBanners();
-  const banner = banners.find(b => b.id === req.params.id || b.section === req.params.id);
-  if (!banner) {
-    return res.status(404).json({ error: 'Banner not found' });
-  }
-  res.json(banner);
-});
-
-// POST /api/banners - Create or update banner with image upload or URL
-app.post('/api/banners', upload.single('image'), (req, res) => {
-  try {
-    const banners = readBanners();
-    let imageUrl = req.body.imageUrl || '';
-
-    if (req.file) {
-      imageUrl = `/uploads/${req.file.filename}`;
-    }
-
-    const id = req.body.id || req.body.section || `banner-${Date.now()}`;
-    const section = req.body.section || id;
-
-    const existingIndex = banners.findIndex(b => b.id === id || b.section === section);
-    if (existingIndex !== -1) {
-      const existing = banners[existingIndex];
-      const updated = {
-        ...existing,
-        sectionName: req.body.sectionName !== undefined ? req.body.sectionName : existing.sectionName,
-        badge: req.body.badge !== undefined ? req.body.badge : existing.badge,
-        watermark: req.body.watermark !== undefined ? req.body.watermark : existing.watermark,
-        title: req.body.title !== undefined ? req.body.title : existing.title,
-        subtitle: req.body.subtitle !== undefined ? req.body.subtitle : existing.subtitle,
-        scriptText: req.body.scriptText !== undefined ? req.body.scriptText : existing.scriptText,
-        buttonText: req.body.buttonText !== undefined ? req.body.buttonText : existing.buttonText,
-        buttonLink: req.body.buttonLink !== undefined ? req.body.buttonLink : existing.buttonLink,
-        secondaryBtnText: req.body.secondaryBtnText !== undefined ? req.body.secondaryBtnText : existing.secondaryBtnText,
-        secondaryBtnLink: req.body.secondaryBtnLink !== undefined ? req.body.secondaryBtnLink : existing.secondaryBtnLink,
-        imageUrl: imageUrl || existing.imageUrl,
-        isActive: req.body.isActive !== undefined ? (req.body.isActive === 'true' || req.body.isActive === true) : existing.isActive,
-        updatedAt: new Date().toISOString()
-      };
-      banners[existingIndex] = updated;
-      writeBanners(banners);
-      logActivity('Banner Updated', `Updated editorial banner "${updated.title}"`);
-      return res.json({ success: true, message: 'Banner updated successfully', banner: updated });
-    }
-
-    if (!imageUrl) {
-      return res.status(400).json({ error: 'An image file or imageUrl is required.' });
-    }
-
-    const newBanner = {
-      id,
-      section,
-      sectionName: req.body.sectionName || 'Section Banner',
-      badge: req.body.badge || 'LUXURY WINTER EDIT',
-      watermark: req.body.watermark || 'UNSTITCHED',
-      title: req.body.title || 'UNSTITCHED FABRICS',
-      subtitle: req.body.subtitle || '',
-      scriptText: req.body.scriptText || '',
-      buttonText: req.body.buttonText || 'EXPLORE DESIGNS',
-      buttonLink: req.body.buttonLink || '#unstitched-grid',
-      secondaryBtnText: req.body.secondaryBtnText || 'SHOP NOW',
-      secondaryBtnLink: req.body.secondaryBtnLink || '#unstitched',
-      imageUrl,
-      isActive: req.body.isActive !== undefined ? (req.body.isActive === 'true' || req.body.isActive === true) : true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    banners.push(newBanner);
-    writeBanners(banners);
-    logActivity('Banner Created', `Created editorial banner "${newBanner.title}"`);
-    res.status(201).json({ success: true, message: 'Banner created successfully', banner: newBanner });
-  } catch (error) {
-    console.error('Error creating banner:', error);
-    res.status(500).json({ error: error.message || 'Failed to create banner' });
-  }
-});
-
-// PUT /api/banners/:id - Update existing banner
-app.put('/api/banners/:id', upload.single('image'), (req, res) => {
-  try {
-    const banners = readBanners();
-    const index = banners.findIndex(b => b.id === req.params.id || b.section === req.params.id);
-    if (index === -1) {
-      return res.status(404).json({ error: 'Banner not found' });
-    }
-
-    const existing = banners[index];
-    let imageUrl = existing.imageUrl;
-
-    if (req.file) {
-      const oldFilename = existing.imageUrl?.startsWith('/uploads/') ? path.basename(existing.imageUrl) : null;
-      if (oldFilename && oldFilename !== 'user-limelight-banner.jpg') {
-        const oldPath = path.join(UPLOADS_DIR, oldFilename);
-        if (fs.existsSync(oldPath)) {
-          try { fs.unlinkSync(oldPath); } catch (e) { /* ignore */ }
-        }
-      }
-      imageUrl = `/uploads/${req.file.filename}`;
-    } else if (req.body.imageUrl) {
-      imageUrl = req.body.imageUrl;
-    }
-
-    const updated = {
-      ...existing,
-      sectionName: req.body.sectionName !== undefined ? req.body.sectionName : existing.sectionName,
-      badge: req.body.badge !== undefined ? req.body.badge : existing.badge,
-      watermark: req.body.watermark !== undefined ? req.body.watermark : existing.watermark,
-      title: req.body.title !== undefined ? req.body.title : existing.title,
-      subtitle: req.body.subtitle !== undefined ? req.body.subtitle : existing.subtitle,
-      scriptText: req.body.scriptText !== undefined ? req.body.scriptText : existing.scriptText,
-      buttonText: req.body.buttonText !== undefined ? req.body.buttonText : existing.buttonText,
-      buttonLink: req.body.buttonLink !== undefined ? req.body.buttonLink : existing.buttonLink,
-      secondaryBtnText: req.body.secondaryBtnText !== undefined ? req.body.secondaryBtnText : existing.secondaryBtnText,
-      secondaryBtnLink: req.body.secondaryBtnLink !== undefined ? req.body.secondaryBtnLink : existing.secondaryBtnLink,
-      imageUrl,
-      isActive: req.body.isActive !== undefined ? (req.body.isActive === 'true' || req.body.isActive === true) : existing.isActive,
-      updatedAt: new Date().toISOString()
-    };
-
-    banners[index] = updated;
-    writeBanners(banners);
-    logActivity('Banner Updated', `Updated editorial banner "${updated.title}"`);
-
-    res.json({ success: true, message: 'Banner updated successfully', banner: updated });
-  } catch (error) {
-    console.error('Error updating banner:', error);
-    res.status(500).json({ error: error.message || 'Failed to update banner' });
-  }
-});
-
-// DELETE /api/banners/:id - Delete a banner
-app.delete('/api/banners/:id', (req, res) => {
-  try {
-    const banners = readBanners();
-    const index = banners.findIndex(b => b.id === req.params.id || b.section === req.params.id);
-    if (index === -1) {
-      return res.status(404).json({ error: 'Banner not found' });
-    }
-
-    const deleted = banners[index];
-    if (deleted.imageUrl && deleted.imageUrl.startsWith('/uploads/')) {
-      const filename = path.basename(deleted.imageUrl);
-      if (filename !== 'user-limelight-banner.jpg') {
-        const filePath = path.join(UPLOADS_DIR, filename);
-        if (fs.existsSync(filePath)) {
-          try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
-        }
-      }
-    }
-
-    banners.splice(index, 1);
-    writeBanners(banners);
-    logActivity('Banner Deleted', `Deleted banner "${deleted.title}" (ID: ${req.params.id})`);
-
-    res.json({ success: true, message: 'Banner deleted successfully', id: req.params.id });
-  } catch (error) {
-    console.error('Error deleting banner:', error);
-    res.status(500).json({ error: error.message || 'Failed to delete banner' });
-  }
-});
-
-// POST /api/banners/reset - Reset banners to default
-app.post('/api/banners/reset', (req, res) => {
-  writeBanners(DEFAULT_BANNERS);
-  logActivity('Banners Reset', 'Reset section banners to default Limelight editorial values');
-  res.json({ success: true, message: 'Banners reset to defaults', banners: DEFAULT_BANNERS });
-});
-
-// ================= PRODUCTS API ROUTES =================
-
-// GET /api/products - Get all products with optional category & active filters
-app.get('/api/products', async (req, res) => {
-  const includeInactive = req.query.all === 'true' || req.query.admin === 'true';
-  const categoryFilter = req.query.category;
-
-  if (isMongoConnected()) {
-    try {
-      const query = {};
-      if (!includeInactive) {
-        query.isActive = { $ne: false };
-      }
-      if (categoryFilter && categoryFilter.toLowerCase() !== 'all') {
-        query.category = new RegExp(`^${categoryFilter}$`, 'i');
-      }
-      const mongoProducts = await Product.find(query).sort({ createdAt: -1 });
-      if (mongoProducts && mongoProducts.length > 0) {
-        return res.json(mongoProducts);
-      }
-    } catch (err) {
-      console.warn('MongoDB query error, falling back to JSON:', err.message);
-    }
-  }
-
-  let products = readProducts();
-
-  if (!includeInactive) {
-    products = products.filter(p => p.isActive !== false);
-  }
-
-  if (categoryFilter && categoryFilter.toLowerCase() !== 'all') {
-    products = products.filter(p =>
-      p.category && p.category.toLowerCase() === categoryFilter.toLowerCase()
-    );
-  }
-
-  res.json(products);
-});
-
-// GET /api/products/:id - Single product by ID
-app.get('/api/products/:id', async (req, res) => {
-  const targetId = req.params.id;
-  if (isMongoConnected()) {
-    try {
-      const mongoFilter = {
-        $or: [
-          { id: targetId },
-          ...(mongoose.Types.ObjectId.isValid(targetId) ? [{ _id: targetId }] : [])
-        ]
-      };
-      const p = await Product.findOne(mongoFilter);
-      if (p) return res.json(p);
-    } catch (err) {
-      console.warn('MongoDB single product error:', err.message);
-    }
-  }
-
-  const products = readProducts();
-  const product = products.find(p => p.id === targetId || p._id === targetId);
-  if (!product) {
-    return res.status(404).json({ error: 'Product not found' });
-  }
-  res.json(product);
-});
-
-// POST /api/products - Create/Upload new product
-app.post('/api/products', upload.single('image'), async (req, res) => {
-  try {
-    const products = readProducts();
-    let imageUrl = req.body.image || req.body.imageUrl || '';
-
-    if (req.file) {
-      imageUrl = await processUploadedImage(req.file, 'limelight/products');
-    }
-
-    if (!imageUrl) {
-      return res.status(400).json({ error: 'Product photography (image file or URL) is required.' });
-    }
-
-    if (!req.body.title || !req.body.title.trim()) {
-      return res.status(400).json({ error: 'Product title is required.' });
-    }
-
-    const price = parseInt(req.body.price, 10) || 0;
-    const originalPrice = req.body.originalPrice ? parseInt(req.body.originalPrice, 10) : null;
-    let discount = req.body.discount ? req.body.discount.trim() : '';
-
-    if (!discount && originalPrice && originalPrice > price) {
-      const pct = Math.round(((originalPrice - price) / originalPrice) * 100);
-      discount = `${pct}% OFF`;
-    }
-
-    const category = req.body.category || 'Unstitched';
-    const subCategory = req.body.subCategory || '3 Piece';
-
-    let sizes = null;
-    if (req.body.sizes) {
-      try {
-        sizes = typeof req.body.sizes === 'string' ? JSON.parse(req.body.sizes) : req.body.sizes;
-      } catch (e) {
-        sizes = req.body.sizes.split(',').map(s => s.trim()).filter(Boolean);
-      }
-    } else if (category.toLowerCase().includes('ready')) {
-      sizes = ['XS', 'S', 'M', 'L', 'XL'];
-    }
-
-    const fit = req.body.fit || (category.toLowerCase().includes('ready') ? 'Standard Fit' : '');
-
-    const newProduct = {
-      id: `prod-${Date.now()}-${Math.round(Math.random() * 1000)}`,
-      title: req.body.title.trim(),
-      category: category.trim(),
-      subCategory: subCategory.trim(),
-      price: price,
-      originalPrice: originalPrice,
-      discount: discount,
-      image: imageUrl,
-      fabric: req.body.fabric || 'Luxury Fabric',
-      fit: fit,
-      sizes: sizes,
-      pieces: req.body.pieces || subCategory,
-      color: req.body.color || 'Standard',
-      sku: req.body.sku || `LM-${category.slice(0, 2).toUpperCase()}-${Date.now().toString().slice(-4)}`,
-      isActive: req.body.isActive !== undefined ? (req.body.isActive === 'true' || req.body.isActive === true) : true,
-      inStock: req.body.inStock !== undefined ? (req.body.inStock === 'true' || req.body.inStock === true) : true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    if (isMongoConnected()) {
-      try {
-        await Product.create(newProduct);
-      } catch (mongoErr) {
-        console.warn("MongoDB product create error:", mongoErr.message);
-      }
-    }
-
-    products.unshift(newProduct);
-    writeProducts(products);
-    logActivity('Product Created', `Added product "${newProduct.title}" (Rs. ${newProduct.price.toLocaleString()})`);
-
-    res.status(201).json({
-      success: true,
-      message: 'Product created successfully',
-      product: newProduct
-    });
-  } catch (error) {
-    console.error('Error creating product:', error);
-    res.status(500).json({ error: error.message || 'Failed to create product' });
-  }
-});
-
-// PUT /api/products/:id - Update existing product
-app.put('/api/products/:id', upload.single('image'), async (req, res) => {
+app.put('/api/features/:id', async (req, res) => {
   try {
     const targetId = req.params.id;
-    const products = readProducts();
-    const index = products.findIndex(p => p.id === targetId || p._id === targetId);
+    const features = await readCollectionWithMongoFallback(Feature, readFeatures);
+    const index = features.findIndex(f => f.id === targetId || String(f._id) === targetId);
+    if (index === -1) return res.status(404).json({ error: 'Feature not found' });
 
-    let existing = index !== -1 ? products[index] : null;
-
-    if (!existing && isMongoConnected()) {
-      try {
-        const filter = {
-          $or: [
-            { id: targetId },
-            ...(mongoose.Types.ObjectId.isValid(targetId) ? [{ _id: targetId }] : [])
-          ]
-        };
-        const doc = await Product.findOne(filter);
-        if (doc) {
-          existing = doc.toObject ? doc.toObject() : doc;
-        }
-      } catch (err) {
-        console.warn('MongoDB find error in PUT:', err.message);
-      }
-    }
-
-    if (!existing) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
-    let imageUrl = existing.image;
-
-    if (req.file) {
-      const oldFilename = existing.image?.startsWith('/uploads/') ? path.basename(existing.image) : null;
-      if (oldFilename && oldFilename !== 'user-limelight-banner.jpg') {
-        const oldPath = path.join(UPLOADS_DIR, oldFilename);
-        if (fs.existsSync(oldPath)) {
-          try { fs.unlinkSync(oldPath); } catch (e) { /* ignore */ }
-        }
-      }
-      imageUrl = await processUploadedImage(req.file, 'limelight/products');
-    } else if (req.body.image || req.body.imageUrl) {
-      imageUrl = req.body.image || req.body.imageUrl;
-    }
-
-    const price = req.body.price !== undefined ? parseInt(req.body.price, 10) : existing.price;
-    const originalPrice = req.body.originalPrice !== undefined ? (req.body.originalPrice ? parseInt(req.body.originalPrice, 10) : null) : existing.originalPrice;
-    let discount = req.body.discount !== undefined ? req.body.discount : existing.discount;
-
-    if (discount === '' && originalPrice && originalPrice > price) {
-      const pct = Math.round(((originalPrice - price) / originalPrice) * 100);
-      discount = `${pct}% OFF`;
-    }
-
-    let sizes = existing.sizes;
-    if (req.body.sizes !== undefined) {
-      if (!req.body.sizes) {
-        sizes = null;
-      } else {
-        try {
-          sizes = typeof req.body.sizes === 'string' ? JSON.parse(req.body.sizes) : req.body.sizes;
-        } catch (e) {
-          sizes = req.body.sizes ? req.body.sizes.split(',').map(s => s.trim()).filter(Boolean) : null;
-        }
-      }
-    }
-
-    const updated = {
+    const existing = stripMongoMeta(features[index]);
+    const updated = stripMongoMeta({
       ...existing,
       title: req.body.title !== undefined ? req.body.title.trim() : existing.title,
       category: req.body.category !== undefined ? req.body.category.trim() : existing.category,
@@ -1798,29 +1106,16 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
       isActive: req.body.isActive !== undefined ? (req.body.isActive === 'true' || req.body.isActive === true) : existing.isActive,
       inStock: req.body.inStock !== undefined ? (req.body.inStock === 'true' || req.body.inStock === true) : existing.inStock,
       updatedAt: new Date().toISOString()
-    };
+    });
 
-    if (isMongoConnected()) {
-      try {
-        const updateFilter = {
-          $or: [
-            { id: targetId },
-            ...(mongoose.Types.ObjectId.isValid(targetId) ? [{ _id: targetId }] : [])
-          ]
-        };
-        await Product.updateOne(updateFilter, { $set: updated }, { upsert: true });
-        console.log(`[MongoDB] Updated product "${updated.title}" (ID: ${targetId})`);
-      } catch (mongoErr) {
-        console.error('Error updating product in MongoDB:', mongoErr);
-      }
-    }
+    await upsertMongoDoc(Product, buildIdFilter(targetId), updated);
 
     if (index !== -1) {
       products[index] = updated;
     } else {
       products.unshift(updated);
     }
-    writeProducts(products);
+    try { fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
 
     logActivity('Product Updated', `Updated product "${updated.title}"`);
 
@@ -1927,18 +1222,28 @@ app.post('/api/products/reset', async (req, res) => {
 // ================= CURATED COLLECTIONS API ROUTES =================
 
 // GET /api/collections - Return all collections
-app.get('/api/collections', (req, res) => {
+app.get('/api/collections', async (req, res) => {
   const includeInactive = req.query.all === 'true' || req.query.admin === 'true';
-  const collections = readCollections();
+  const collections = await readCollectionWithMongoFallback(Collection, readCollections, { order: 1 });
   const filtered = includeInactive ? collections : collections.filter(c => c.isActive !== false);
   filtered.sort((a, b) => (a.order || 0) - (b.order || 0));
   res.json(filtered);
 });
 
 // GET /api/collections/:id - Single collection
-app.get('/api/collections/:id', (req, res) => {
+app.get('/api/collections/:id', async (req, res) => {
+  const targetId = req.params.id;
+  if (isMongoConnected()) {
+    try {
+      const item = await Collection.findOne(buildIdFilter(targetId)).lean();
+      if (item) return res.json(item);
+      return res.status(404).json({ error: 'Collection not found' });
+    } catch (err) {
+      console.warn('MongoDB collection error:', err.message);
+    }
+  }
   const collections = readCollections();
-  const item = collections.find(c => c.id === req.params.id);
+  const item = collections.find(c => c.id === targetId);
   if (!item) {
     return res.status(404).json({ error: 'Collection not found' });
   }
@@ -1946,13 +1251,13 @@ app.get('/api/collections/:id', (req, res) => {
 });
 
 // POST /api/collections - Create a new collection
-app.post('/api/collections', upload.single('image'), (req, res) => {
+app.post('/api/collections', upload.single('image'), async (req, res) => {
   try {
-    const collections = readCollections();
+    const collections = await readCollectionWithMongoFallback(Collection, readCollections);
     let imageUrl = req.body.image || req.body.imageUrl || '';
 
     if (req.file) {
-      imageUrl = `/uploads/${req.file.filename}`;
+      imageUrl = await processUploadedImage(req.file, 'limelight/collections');
     }
 
     if (!imageUrl) {
@@ -1979,8 +1284,9 @@ app.post('/api/collections', upload.single('image'), (req, res) => {
       updatedAt: new Date().toISOString()
     };
 
+    await upsertMongoDoc(Collection, { id: newCollection.id }, newCollection);
     collections.push(newCollection);
-    writeCollections(collections);
+    try { fs.writeFileSync(COLLECTIONS_FILE, JSON.stringify(collections.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
     logActivity('Collection Created', `Added curated collection "${newCollection.title}"`);
 
     res.status(201).json({
@@ -1995,26 +1301,20 @@ app.post('/api/collections', upload.single('image'), (req, res) => {
 });
 
 // PUT /api/collections/:id - Update existing collection
-app.put('/api/collections/:id', upload.single('image'), (req, res) => {
+app.put('/api/collections/:id', upload.single('image'), async (req, res) => {
   try {
-    const collections = readCollections();
-    const index = collections.findIndex(c => c.id === req.params.id);
+    const targetId = req.params.id;
+    const collections = await readCollectionWithMongoFallback(Collection, readCollections);
+    const index = collections.findIndex(c => c.id === targetId || String(c._id) === targetId);
     if (index === -1) {
       return res.status(404).json({ error: 'Collection not found' });
     }
 
-    const existing = collections[index];
+    const existing = stripMongoMeta(collections[index]);
     let imageUrl = existing.image;
 
     if (req.file) {
-      const oldFilename = existing.image?.startsWith('/uploads/') ? path.basename(existing.image) : null;
-      if (oldFilename && oldFilename !== 'user-limelight-banner.jpg') {
-        const oldPath = path.join(UPLOADS_DIR, oldFilename);
-        if (fs.existsSync(oldPath)) {
-          try { fs.unlinkSync(oldPath); } catch (e) { /* ignore */ }
-        }
-      }
-      imageUrl = `/uploads/${req.file.filename}`;
+      imageUrl = await processUploadedImage(req.file, 'limelight/collections');
     } else if (req.body.image || req.body.imageUrl) {
       imageUrl = req.body.image || req.body.imageUrl;
     }
@@ -2032,8 +1332,9 @@ app.put('/api/collections/:id', upload.single('image'), (req, res) => {
       updatedAt: new Date().toISOString()
     };
 
+    await upsertMongoDoc(Collection, buildIdFilter(targetId), updated);
     collections[index] = updated;
-    writeCollections(collections);
+    try { fs.writeFileSync(COLLECTIONS_FILE, JSON.stringify(collections.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
     logActivity('Collection Updated', `Updated collection "${updated.title}"`);
 
     res.json({
@@ -2054,18 +1355,8 @@ app.delete('/api/collections/:id', async (req, res) => {
     let found = false;
 
     if (isMongoConnected()) {
-      try {
-        const mongoFilter = {
-          $or: [
-            { id: targetId },
-            ...(mongoose.Types.ObjectId.isValid(targetId) ? [{ _id: targetId }] : [])
-          ]
-        };
-        await Collection.deleteMany(mongoFilter);
-        found = true;
-      } catch (mongoErr) {
-        console.error('Error deleting collection from MongoDB:', mongoErr);
-      }
+      const delRes = await Collection.deleteMany(buildIdFilter(targetId));
+      if (delRes.deletedCount > 0) found = true;
     }
 
     const collections = readCollections();
@@ -2073,14 +1364,6 @@ app.delete('/api/collections/:id', async (req, res) => {
     if (index !== -1) {
       found = true;
       const deleted = collections[index];
-      if (deleted.image && deleted.image.startsWith('/uploads/')) {
-        const filename = path.basename(deleted.image);
-        const filePath = path.join(UPLOADS_DIR, filename);
-        if (fs.existsSync(filePath)) {
-          try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
-        }
-      }
-
       collections.splice(index, 1);
       try {
         fs.writeFileSync(COLLECTIONS_FILE, JSON.stringify(collections, null, 2), 'utf-8');
@@ -2101,21 +1384,25 @@ app.delete('/api/collections/:id', async (req, res) => {
   }
 });
 
-app.post('/api/collections/reset', (req, res) => {
+app.post('/api/collections/reset', async (req, res) => {
+  if (isMongoConnected()) {
+    await Collection.deleteMany({});
+    if (DEFAULT_COLLECTIONS.length > 0) await Collection.insertMany(DEFAULT_COLLECTIONS);
+  }
   writeCollections(DEFAULT_COLLECTIONS);
-  logActivity('Collections Reset', 'Reset curated collections to default Limelight items');
+  logActivity('Collections Reset', 'Reset curated collections to default items');
   res.json({ success: true, message: 'Curated collections reset to defaults', collections: DEFAULT_COLLECTIONS });
 });
 
 // POST /api/collections/reorder - Reorder collections
-app.post('/api/collections/reorder', (req, res) => {
+app.post('/api/collections/reorder', async (req, res) => {
   try {
     const { orderIds } = req.body;
     if (!Array.isArray(orderIds)) {
       return res.status(400).json({ error: 'orderIds array is required' });
     }
-    const collections = readCollections();
-    const map = new Map(collections.map(c => [c.id, c]));
+    const collections = await readCollectionWithMongoFallback(Collection, readCollections);
+    const map = new Map(collections.map(c => [c.id, stripMongoMeta(c)]));
     const reordered = [];
     orderIds.forEach((id, idx) => {
       const item = map.get(id);
@@ -2127,7 +1414,8 @@ app.post('/api/collections/reorder', (req, res) => {
       }
     });
     map.forEach(item => reordered.push(item));
-    writeCollections(reordered);
+    await syncCollectionToMongo(Collection, reordered);
+    try { fs.writeFileSync(COLLECTIONS_FILE, JSON.stringify(reordered, null, 2), 'utf-8'); } catch (e) {}
     logActivity('Collections Reordered', `Reordered ${reordered.length} collections`);
     res.json({ success: true, collections: reordered });
   } catch (error) {
@@ -2151,10 +1439,8 @@ app.get('/api/new-arrivals', async (req, res) => {
       if (category && category.toUpperCase() !== 'ALL') {
         query.category = new RegExp(category, 'i');
       }
-      const mongoItems = await NewArrival.find(query).sort({ order: 1 });
-      if (mongoItems && mongoItems.length > 0) {
-        return res.json(mongoItems);
-      }
+      const mongoItems = await NewArrival.find(query).sort({ order: 1, createdAt: -1 }).lean();
+      return res.json(mongoItems || []);
     } catch (err) {
       console.warn('MongoDB new-arrivals query error:', err.message);
     }
@@ -2171,9 +1457,17 @@ app.get('/api/new-arrivals', async (req, res) => {
 });
 
 // GET /api/new-arrivals/:id - Single new arrival
-app.get('/api/new-arrivals/:id', (req, res) => {
+app.get('/api/new-arrivals/:id', async (req, res) => {
+  const targetId = req.params.id;
+  if (isMongoConnected()) {
+    try {
+      const item = await NewArrival.findOne(buildIdFilter(targetId)).lean();
+      if (item) return res.json(item);
+      return res.status(404).json({ error: 'New arrival item not found' });
+    } catch (err) {}
+  }
   const items = readNewArrivals();
-  const item = items.find(i => i.id === req.params.id);
+  const item = items.find(i => i.id === targetId);
   if (!item) {
     return res.status(404).json({ error: 'New arrival item not found' });
   }
@@ -2181,13 +1475,13 @@ app.get('/api/new-arrivals/:id', (req, res) => {
 });
 
 // POST /api/new-arrivals - Create new arrival
-app.post('/api/new-arrivals', upload.single('image'), (req, res) => {
+app.post('/api/new-arrivals', upload.single('image'), async (req, res) => {
   try {
-    const items = readNewArrivals();
+    const items = await readCollectionWithMongoFallback(NewArrival, readNewArrivals);
     let imageUrl = req.body.image || req.body.imageUrl || '';
 
     if (req.file) {
-      imageUrl = `/uploads/${req.file.filename}`;
+      imageUrl = await processUploadedImage(req.file, 'limelight/new-arrivals');
     }
 
     if (!imageUrl) {
@@ -2222,12 +1516,17 @@ app.post('/api/new-arrivals', upload.single('image'), (req, res) => {
       sku: req.body.sku || `NA-${category.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`,
       isActive: req.body.isActive !== undefined ? (req.body.isActive === 'true' || req.body.isActive === true) : true,
       inStock: req.body.inStock !== undefined ? (req.body.inStock === 'true' || req.body.inStock === true) : true,
+      order: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
+    if (isMongoConnected()) {
+      await NewArrival.create(newItem);
+    }
+
     items.unshift(newItem);
-    writeNewArrivals(items);
+    try { fs.writeFileSync(NEW_ARRIVALS_FILE, JSON.stringify(items.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
     logActivity('New Arrival Created', `Added "${newItem.title}" (${newItem.badge})`);
 
     res.status(201).json({
@@ -2242,26 +1541,20 @@ app.post('/api/new-arrivals', upload.single('image'), (req, res) => {
 });
 
 // PUT /api/new-arrivals/:id - Update existing new arrival
-app.put('/api/new-arrivals/:id', upload.single('image'), (req, res) => {
+app.put('/api/new-arrivals/:id', upload.single('image'), async (req, res) => {
   try {
-    const items = readNewArrivals();
-    const index = items.findIndex(i => i.id === req.params.id);
+    const targetId = req.params.id;
+    const items = await readCollectionWithMongoFallback(NewArrival, readNewArrivals);
+    const index = items.findIndex(i => i.id === targetId || String(i._id) === targetId);
     if (index === -1) {
       return res.status(404).json({ error: 'New arrival item not found' });
     }
 
-    const existing = items[index];
+    const existing = stripMongoMeta(items[index]);
     let imageUrl = existing.image;
 
     if (req.file) {
-      const oldFilename = existing.image?.startsWith('/uploads/') ? path.basename(existing.image) : null;
-      if (oldFilename && oldFilename !== 'user-limelight-banner.jpg') {
-        const oldPath = path.join(UPLOADS_DIR, oldFilename);
-        if (fs.existsSync(oldPath)) {
-          try { fs.unlinkSync(oldPath); } catch (e) { /* ignore */ }
-        }
-      }
-      imageUrl = `/uploads/${req.file.filename}`;
+      imageUrl = await processUploadedImage(req.file, 'limelight/new-arrivals');
     } else if (req.body.image || req.body.imageUrl) {
       imageUrl = req.body.image || req.body.imageUrl;
     }
@@ -2291,8 +1584,9 @@ app.put('/api/new-arrivals/:id', upload.single('image'), (req, res) => {
       updatedAt: new Date().toISOString()
     };
 
+    await upsertMongoDoc(NewArrival, buildIdFilter(targetId), updated);
     items[index] = updated;
-    writeNewArrivals(items);
+    try { fs.writeFileSync(NEW_ARRIVALS_FILE, JSON.stringify(items.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
     logActivity('New Arrival Updated', `Updated "${updated.title}"`);
 
     res.json({
@@ -2307,28 +1601,31 @@ app.put('/api/new-arrivals/:id', upload.single('image'), (req, res) => {
 });
 
 // DELETE /api/new-arrivals/:id - Delete new arrival
-app.delete('/api/new-arrivals/:id', (req, res) => {
+app.delete('/api/new-arrivals/:id', async (req, res) => {
   try {
+    const targetId = req.params.id;
+    let found = false;
+
+    if (isMongoConnected()) {
+      const delRes = await NewArrival.deleteMany(buildIdFilter(targetId));
+      if (delRes.deletedCount > 0) found = true;
+    }
+
     const items = readNewArrivals();
-    const index = items.findIndex(i => i.id === req.params.id);
-    if (index === -1) {
+    const index = items.findIndex(i => i.id === targetId || i._id === targetId);
+    if (index !== -1) {
+      found = true;
+      const deleted = items[index];
+      items.splice(index, 1);
+      try { fs.writeFileSync(NEW_ARRIVALS_FILE, JSON.stringify(items, null, 2), 'utf-8'); } catch (e) {}
+      logActivity('New Arrival Deleted', `Deleted "${deleted.title}"`);
+    }
+
+    if (!found) {
       return res.status(404).json({ error: 'New arrival not found' });
     }
 
-    const deleted = items[index];
-    if (deleted.image && deleted.image.startsWith('/uploads/')) {
-      const filename = path.basename(deleted.image);
-      const filePath = path.join(UPLOADS_DIR, filename);
-      if (fs.existsSync(filePath)) {
-        try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
-      }
-    }
-
-    items.splice(index, 1);
-    writeNewArrivals(items);
-    logActivity('New Arrival Deleted', `Deleted "${deleted.title}"`);
-
-    res.json({ success: true, message: 'New arrival deleted successfully', id: req.params.id });
+    res.json({ success: true, message: 'New arrival deleted successfully', id: targetId });
   } catch (error) {
     console.error('Error deleting new arrival:', error);
     res.status(500).json({ error: error.message || 'Failed to delete new arrival' });
@@ -2336,41 +1633,50 @@ app.delete('/api/new-arrivals/:id', (req, res) => {
 });
 
 // POST /api/new-arrivals/reset - Reset to defaults
-app.post('/api/new-arrivals/reset', (req, res) => {
+app.post('/api/new-arrivals/reset', async (req, res) => {
+  if (isMongoConnected()) {
+    await NewArrival.deleteMany({});
+    if (DEFAULT_NEW_ARRIVALS.length > 0) await NewArrival.insertMany(DEFAULT_NEW_ARRIVALS);
+  }
   writeNewArrivals(DEFAULT_NEW_ARRIVALS);
-  logActivity('New Arrivals Reset', 'Reset new arrivals to default Limelight items');
+  logActivity('New Arrivals Reset', 'Reset new arrivals to default items');
   res.json({ success: true, message: 'New arrivals reset to defaults', items: DEFAULT_NEW_ARRIVALS });
 });
 
 // ================= ORDERS API ROUTES =================
 
 // GET /api/orders - Return all orders
-app.get('/api/orders', (req, res) => {
-  const orders = readOrders();
+app.get('/api/orders', async (req, res) => {
+  const orders = await readCollectionWithMongoFallback(Order, readOrders);
   const status = req.query.status;
   let filtered = orders;
   if (status && status.toUpperCase() !== 'ALL') {
     filtered = filtered.filter(o => o.status?.toLowerCase() === status.toLowerCase());
   }
-  // Sort by createdAt descending (newest first)
   filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   res.json(filtered);
 });
 
 // GET /api/orders/:id - Single order
-app.get('/api/orders/:id', (req, res) => {
-  const orders = readOrders();
-  const order = orders.find(o => o.id === req.params.id);
-  if (!order) {
-    return res.status(404).json({ error: 'Order not found' });
+app.get('/api/orders/:id', async (req, res) => {
+  const targetId = req.params.id;
+  if (isMongoConnected()) {
+    try {
+      const order = await Order.findOne(buildIdFilter(targetId)).lean();
+      if (order) return res.json(order);
+      return res.status(404).json({ error: 'Order not found' });
+    } catch (err) {}
   }
+  const orders = readOrders();
+  const order = orders.find(o => o.id === targetId);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
   res.json(order);
 });
 
 // POST /api/orders - Create new order from Storefront checkout
-app.post('/api/orders', (req, res) => {
+app.post('/api/orders', async (req, res) => {
   try {
-    const orders = readOrders();
+    const orders = await readCollectionWithMongoFallback(Order, readOrders);
     const { customer, items, subtotal, shipping, total, paymentMethod, source } = req.body;
 
     if (!customer || !customer.name || !customer.phone || !customer.address || !customer.city) {
@@ -2416,31 +1722,27 @@ app.post('/api/orders', (req, res) => {
       isRegisteredUser: Boolean(req.body.isRegisteredUser || req.body.userId)
     };
 
+    await upsertMongoDoc(Order, { id: newOrder.id }, newOrder);
     orders.unshift(newOrder);
-    writeOrders(orders);
+    try { fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
     logActivity('Order Placed', `Order #${newOrder.id} placed by ${newOrder.customer.name} (Rs. ${newOrder.total.toLocaleString()})`);
 
-    res.status(201).json({
-      success: true,
-      message: 'Order placed successfully',
-      order: newOrder
-    });
+    res.status(201).json({ success: true, message: 'Order placed successfully', order: newOrder });
   } catch (error) {
     console.error('Error creating order:', error);
     res.status(500).json({ error: error.message || 'Failed to place order' });
   }
 });
 
-// PUT /api/orders/:id - Update order status (Pending, Confirmed, Shipped, Delivered, Cancelled)
-app.put('/api/orders/:id', (req, res) => {
+// PUT /api/orders/:id - Update order status
+app.put('/api/orders/:id', async (req, res) => {
   try {
-    const orders = readOrders();
-    const index = orders.findIndex(o => o.id === req.params.id);
-    if (index === -1) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
+    const targetId = req.params.id;
+    const orders = await readCollectionWithMongoFallback(Order, readOrders);
+    const index = orders.findIndex(o => o.id === targetId || String(o._id) === targetId);
+    if (index === -1) return res.status(404).json({ error: 'Order not found' });
 
-    const existing = orders[index];
+    const existing = stripMongoMeta(orders[index]);
     const updated = {
       ...existing,
       status: req.body.status || existing.status,
@@ -2448,43 +1750,51 @@ app.put('/api/orders/:id', (req, res) => {
       updatedAt: new Date().toISOString()
     };
 
+    await upsertMongoDoc(Order, buildIdFilter(targetId), updated);
     orders[index] = updated;
-    writeOrders(orders);
+    try { fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
     logActivity('Order Updated', `Order #${updated.id} status changed to ${updated.status}`);
 
-    res.json({
-      success: true,
-      message: 'Order updated successfully',
-      order: updated
-    });
+    res.json({ success: true, message: 'Order updated successfully', order: updated });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Failed to update order' });
   }
 });
 
 // DELETE /api/orders/:id - Delete order
-app.delete('/api/orders/:id', (req, res) => {
+app.delete('/api/orders/:id', async (req, res) => {
   try {
-    const orders = readOrders();
-    const index = orders.findIndex(o => o.id === req.params.id);
-    if (index === -1) {
-      return res.status(404).json({ error: 'Order not found' });
+    const targetId = req.params.id;
+    let found = false;
+    if (isMongoConnected()) {
+      const delRes = await Order.deleteMany(buildIdFilter(targetId));
+      if (delRes.deletedCount > 0) found = true;
     }
 
-    const deleted = orders.splice(index, 1)[0];
-    writeOrders(orders);
-    logActivity('Order Deleted', `Order #${deleted.id} deleted`);
+    const orders = readOrders();
+    const index = orders.findIndex(o => o.id === targetId || o._id === targetId);
+    if (index !== -1) {
+      found = true;
+      orders.splice(index, 1);
+      try { fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf-8'); } catch (e) {}
+    }
 
-    res.json({ success: true, message: 'Order deleted successfully', id: req.params.id });
+    if (!found) return res.status(404).json({ error: 'Order not found' });
+
+    logActivity('Order Deleted', `Order #${targetId} deleted`);
+    res.json({ success: true, message: 'Order deleted successfully', id: targetId });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Failed to delete order' });
   }
 });
 
 // POST /api/orders/reset - Reset orders to default sample
-app.post('/api/orders/reset', (req, res) => {
+app.post('/api/orders/reset', async (req, res) => {
+  if (isMongoConnected()) {
+    await Order.deleteMany({});
+  }
   writeOrders(DEFAULT_ORDERS);
-  logActivity('Orders Reset', 'Reset orders to default sample');
+  logActivity('Orders Reset', 'Reset orders to default empty list');
   res.json({ success: true, message: 'Orders reset to defaults', orders: DEFAULT_ORDERS });
 });
 
@@ -2756,15 +2066,16 @@ app.get('/api/orders/track/:query', (req, res) => {
 // ================= NAVIGATION ROUTES API =================
 
 // GET /api/navigation - Return all routes (with mapped product counts)
-app.get('/api/navigation', (req, res) => {
+app.get('/api/navigation', async (req, res) => {
   const includeInactive = req.query.all === 'true' || req.query.admin === 'true';
-  const nav = readNavigation();
-  const products = readProducts();
+  const [nav, products] = await Promise.all([
+    readCollectionWithMongoFallback(Navigation, readNavigation, { order: 1 }),
+    readCollectionWithMongoFallback(Product, readProducts)
+  ]);
 
   let list = includeInactive ? nav : nav.filter(n => n.isActive !== false);
   list.sort((a, b) => (a.order || 0) - (b.order || 0));
 
-  // Enrich with count of products mapped to this route/category
   const enriched = list.map(item => {
     const matchingProducts = products.filter(p =>
       (p.category && p.category.toLowerCase() === item.name.toLowerCase()) ||
@@ -2781,22 +2092,30 @@ app.get('/api/navigation', (req, res) => {
 });
 
 // GET /api/navigation/:id - Single route
-app.get('/api/navigation/:id', (req, res) => {
+app.get('/api/navigation/:id', async (req, res) => {
+  const targetId = req.params.id;
+  if (isMongoConnected()) {
+    try {
+      const item = await Navigation.findOne(buildIdFilter(targetId)).lean();
+      if (item) return res.json(item);
+      return res.status(404).json({ error: 'Route not found' });
+    } catch (err) {}
+  }
   const nav = readNavigation();
-  const item = nav.find(n => n.id === req.params.id);
+  const item = nav.find(n => n.id === targetId);
   if (!item) return res.status(404).json({ error: 'Route not found' });
   res.json(item);
 });
 
 // POST /api/navigation - Add new route
-app.post('/api/navigation', (req, res) => {
+app.post('/api/navigation', async (req, res) => {
   try {
     const { name, href, slug, isSale, description, isActive } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Route name is required' });
     }
 
-    const nav = readNavigation();
+    const nav = await readCollectionWithMongoFallback(Navigation, readNavigation);
     const cleanName = name.trim().toUpperCase();
     const cleanSlug = slug ? slug.trim().toLowerCase().replace(/\s+/g, '-') : cleanName.toLowerCase().replace(/\s+/g, '-');
 
@@ -2812,8 +2131,9 @@ app.post('/api/navigation', (req, res) => {
       createdAt: new Date().toISOString()
     };
 
+    await upsertMongoDoc(Navigation, { id: newRoute.id }, newRoute);
     nav.push(newRoute);
-    writeNavigation(nav);
+    try { fs.writeFileSync(NAVIGATION_FILE, JSON.stringify(nav.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
     logActivity('Route Added', `Added new navigation route: ${newRoute.name} (${newRoute.href})`);
 
     res.status(201).json({ success: true, message: 'Route added successfully', route: newRoute });
@@ -2823,23 +2143,25 @@ app.post('/api/navigation', (req, res) => {
 });
 
 // PUT /api/navigation/:id - Update route
-app.put('/api/navigation/:id', (req, res) => {
+app.put('/api/navigation/:id', async (req, res) => {
   try {
-    const nav = readNavigation();
-    const index = nav.findIndex(n => n.id === req.params.id);
+    const targetId = req.params.id;
+    const nav = await readCollectionWithMongoFallback(Navigation, readNavigation);
+    const index = nav.findIndex(n => n.id === targetId || String(n._id) === targetId);
     if (index === -1) return res.status(404).json({ error: 'Route not found' });
 
-    const existing = nav[index];
+    const existing = stripMongoMeta(nav[index]);
     const updated = {
       ...existing,
-      ...req.body,
+      ...stripMongoMeta(req.body),
       id: existing.id,
       name: req.body.name ? req.body.name.trim().toUpperCase() : existing.name,
       updatedAt: new Date().toISOString()
     };
 
+    await upsertMongoDoc(Navigation, buildIdFilter(targetId), updated);
     nav[index] = updated;
-    writeNavigation(nav);
+    try { fs.writeFileSync(NAVIGATION_FILE, JSON.stringify(nav.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
     logActivity('Route Updated', `Updated navigation route: ${updated.name}`);
 
     res.json({ success: true, message: 'Route updated successfully', route: updated });
@@ -2849,35 +2171,46 @@ app.put('/api/navigation/:id', (req, res) => {
 });
 
 // DELETE /api/navigation/:id - Delete route
-app.delete('/api/navigation/:id', (req, res) => {
+app.delete('/api/navigation/:id', async (req, res) => {
   try {
+    const targetId = req.params.id;
+    let found = false;
+    if (isMongoConnected()) {
+      const delRes = await Navigation.deleteMany(buildIdFilter(targetId));
+      if (delRes.deletedCount > 0) found = true;
+    }
+
     const nav = readNavigation();
-    const index = nav.findIndex(n => n.id === req.params.id);
-    if (index === -1) return res.status(404).json({ error: 'Route not found' });
+    const index = nav.findIndex(n => n.id === targetId || n._id === targetId);
+    if (index !== -1) {
+      found = true;
+      nav.splice(index, 1);
+      try { fs.writeFileSync(NAVIGATION_FILE, JSON.stringify(nav, null, 2), 'utf-8'); } catch (e) {}
+    }
 
-    const deleted = nav.splice(index, 1)[0];
-    writeNavigation(nav);
-    logActivity('Route Deleted', `Deleted navigation route: ${deleted.name}`);
+    if (!found) return res.status(404).json({ error: 'Route not found' });
 
-    res.json({ success: true, message: 'Route deleted successfully', id: req.params.id });
+    logActivity('Route Deleted', `Deleted navigation route (ID: ${targetId})`);
+    res.json({ success: true, message: 'Route deleted successfully', id: targetId });
   } catch (err) {
     res.status(500).json({ error: err.message || 'Failed to delete route' });
   }
 });
 
 // POST /api/navigation/reorder - Reorder routes
-app.post('/api/navigation/reorder', (req, res) => {
+app.post('/api/navigation/reorder', async (req, res) => {
   try {
     const { orderIds } = req.body;
     if (!Array.isArray(orderIds)) return res.status(400).json({ error: 'orderIds must be an array' });
 
-    const nav = readNavigation();
+    const nav = (await readCollectionWithMongoFallback(Navigation, readNavigation)).map(stripMongoMeta);
     nav.forEach(item => {
       const idx = orderIds.indexOf(item.id);
       if (idx !== -1) item.order = idx + 1;
     });
 
-    writeNavigation(nav);
+    await syncCollectionToMongo(Navigation, nav);
+    try { fs.writeFileSync(NAVIGATION_FILE, JSON.stringify(nav, null, 2), 'utf-8'); } catch (e) {}
     res.json({ success: true, message: 'Routes reordered', navigation: nav });
   } catch (err) {
     res.status(500).json({ error: 'Failed to reorder routes' });
@@ -2887,21 +2220,37 @@ app.post('/api/navigation/reorder', (req, res) => {
 // ================= BRANDING & SETTINGS API =================
 
 // GET /api/settings - Return site settings & branding
-app.get('/api/settings', (req, res) => {
+app.get('/api/settings', async (req, res) => {
+  if (isMongoConnected()) {
+    try {
+      const mongoSetting = await Setting.findOne({ key: 'site_settings' }).lean();
+      if (mongoSetting) {
+        const { _id, __v, key, ...rest } = mongoSetting;
+        return res.json(rest);
+      }
+    } catch (err) {}
+  }
   res.json(readSettings());
 });
 
 // PUT /api/settings - Update site settings & branding
-app.put('/api/settings', (req, res) => {
+app.put('/api/settings', async (req, res) => {
   try {
-    const current = readSettings();
-    const updated = {
+    let current = readSettings();
+    if (isMongoConnected()) {
+      const mongoSetting = await Setting.findOne({ key: 'site_settings' }).lean();
+      if (mongoSetting) current = stripMongoMeta(mongoSetting);
+    }
+    const updated = stripMongoMeta({
       ...current,
-      ...req.body,
+      ...stripMongoMeta(req.body),
       updatedAt: new Date().toISOString()
-    };
-    writeSettings(updated);
-    logActivity('Settings Updated', `Brand settings and logo configuration updated`);
+    });
+    if (isMongoConnected()) {
+      await Setting.updateOne({ key: 'site_settings' }, { $set: { key: 'site_settings', ...updated } }, { upsert: true });
+    }
+    try { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(updated, null, 2), 'utf-8'); } catch (e) {}
+    logActivity('Settings Updated', 'Brand settings and logo configuration updated');
     res.json({ success: true, message: 'Settings saved successfully', settings: updated });
   } catch (err) {
     res.status(500).json({ error: 'Failed to save settings' });
@@ -2914,14 +2263,21 @@ app.post('/api/settings/logo-upload', upload.single('logo'), async (req, res) =>
     if (!req.file) return res.status(400).json({ error: 'No logo file provided' });
     const logoUrl = await processUploadedImage(req.file, 'limelight/logos');
 
-    const current = readSettings();
+    let current = readSettings();
+    if (isMongoConnected()) {
+      const mongoSetting = await Setting.findOne({ key: 'site_settings' }).lean();
+      if (mongoSetting) current = stripMongoMeta(mongoSetting);
+    }
     current.logoType = 'image';
     current.imageLogo = {
       ...current.imageLogo,
       url: logoUrl
     };
     current.updatedAt = new Date().toISOString();
-    writeSettings(current);
+    if (isMongoConnected()) {
+      await Setting.updateOne({ key: 'site_settings' }, { $set: { key: 'site_settings', ...stripMongoMeta(current) } }, { upsert: true });
+    }
+    try { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(current, null, 2), 'utf-8'); } catch (e) {}
 
     logActivity('Logo Uploaded', `Uploaded custom logo to Cloudinary: ${logoUrl}`);
     res.json({ success: true, message: 'Logo uploaded successfully', logoUrl, settings: current });
@@ -2933,23 +2289,25 @@ app.post('/api/settings/logo-upload', upload.single('logo'), async (req, res) =>
 // ================= HOMEPAGE SECTIONS ORGANIZER API =================
 
 // GET /api/sections - Return homepage sections list in order
-app.get('/api/sections', (req, res) => {
-  const sections = readSections();
+app.get('/api/sections', async (req, res) => {
+  const sections = await readCollectionWithMongoFallback(Section, readSections, { order: 1 });
+  sections.sort((a, b) => (a.order || 0) - (b.order || 0));
   res.json(sections);
 });
 
-// POST /api/sections/reorder - Reorder homepage sections (Drag and Drop / Up-Down)
-app.post('/api/sections/reorder', (req, res) => {
+// POST /api/sections/reorder - Reorder homepage sections
+app.post('/api/sections/reorder', async (req, res) => {
   try {
     const { sectionIds, sections } = req.body;
-    let current = readSections();
+    let current = await readCollectionWithMongoFallback(Section, readSections, { order: 1 });
 
     if (Array.isArray(sections)) {
       current = sections.map((sec, idx) => ({
-        ...sec,
+        ...stripMongoMeta(sec),
         order: idx + 1
       }));
     } else if (Array.isArray(sectionIds)) {
+      current = current.map(stripMongoMeta);
       current.forEach(sec => {
         const idx = sectionIds.indexOf(sec.id);
         if (idx !== -1) sec.order = idx + 1;
@@ -2959,7 +2317,8 @@ app.post('/api/sections/reorder', (req, res) => {
       return res.status(400).json({ error: 'sectionIds or sections array is required' });
     }
 
-    writeSections(current);
+    await syncCollectionToMongo(Section, current);
+    try { fs.writeFileSync(SECTIONS_FILE, JSON.stringify(current, null, 2), 'utf-8'); } catch (e) {}
     logActivity('Sections Reordered', 'Homepage sections display order updated');
     res.json({ success: true, message: 'Sections order saved successfully', sections: current });
   } catch (err) {
@@ -2968,28 +2327,36 @@ app.post('/api/sections/reorder', (req, res) => {
 });
 
 // PUT /api/sections/:id - Toggle enable / update section
-app.put('/api/sections/:id', (req, res) => {
+app.put('/api/sections/:id', async (req, res) => {
   try {
-    const sections = readSections();
-    const index = sections.findIndex(s => s.id === req.params.id);
+    const targetId = req.params.id;
+    const sections = await readCollectionWithMongoFallback(Section, readSections, { order: 1 });
+    const index = sections.findIndex(s => s.id === targetId);
     if (index === -1) return res.status(404).json({ error: 'Section not found' });
 
-    sections[index] = {
-      ...sections[index],
-      ...req.body,
-      id: sections[index].id
+    const existing = stripMongoMeta(sections[index]);
+    const updated = {
+      ...existing,
+      ...stripMongoMeta(req.body),
+      id: existing.id
     };
 
-    writeSections(sections);
-    logActivity('Section Updated', `Updated section "${sections[index].name}"`);
-    res.json({ success: true, message: 'Section updated', section: sections[index] });
+    await upsertMongoDoc(Section, { id: existing.id }, updated);
+    sections[index] = updated;
+    try { fs.writeFileSync(SECTIONS_FILE, JSON.stringify(sections.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
+    logActivity('Section Updated', `Updated section "${updated.name}"`);
+    res.json({ success: true, message: 'Section updated', section: updated });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update section' });
   }
 });
 
 // POST /api/sections/reset - Reset sections to default order
-app.post('/api/sections/reset', (req, res) => {
+app.post('/api/sections/reset', async (req, res) => {
+  if (isMongoConnected()) {
+    await Section.deleteMany({});
+    await Section.insertMany(DEFAULT_SECTIONS);
+  }
   writeSections(DEFAULT_SECTIONS);
   logActivity('Sections Reset', 'Reset homepage sections to default order');
   res.json({ success: true, message: 'Sections reset to default order', sections: DEFAULT_SECTIONS });
@@ -3199,18 +2566,26 @@ app.get('/api/activities', (req, res) => {
 });
 
 // GET /api/slides - Return all slides sorted by order
-app.get('/api/slides', (req, res) => {
+app.get('/api/slides', async (req, res) => {
   const includeInactive = req.query.all === 'true' || req.query.admin === 'true';
-  const slides = readSlides();
+  const slides = await readCollectionWithMongoFallback(Slide, readSlides, { order: 1 });
   const filtered = includeInactive ? slides : slides.filter(s => s.isActive !== false);
   filtered.sort((a, b) => (a.order || 0) - (b.order || 0));
   res.json(filtered);
 });
 
 // GET /api/slides/:id - Single slide
-app.get('/api/slides/:id', (req, res) => {
+app.get('/api/slides/:id', async (req, res) => {
+  const targetId = req.params.id;
+  if (isMongoConnected()) {
+    try {
+      const slide = await Slide.findOne(buildIdFilter(targetId)).lean();
+      if (slide) return res.json(slide);
+      return res.status(404).json({ error: 'Slide not found' });
+    } catch (err) {}
+  }
   const slides = readSlides();
-  const slide = slides.find(s => s.id === req.params.id);
+  const slide = slides.find(s => s.id === targetId);
   if (!slide) {
     return res.status(404).json({ error: 'Slide not found' });
   }
@@ -3218,14 +2593,13 @@ app.get('/api/slides/:id', (req, res) => {
 });
 
 // POST /api/slides - Upload and create a new slide
-app.post('/api/slides', upload.single('image'), (req, res) => {
+app.post('/api/slides', upload.single('image'), async (req, res) => {
   try {
-    const slides = readSlides();
+    const slides = await readCollectionWithMongoFallback(Slide, readSlides);
     let imageUrl = req.body.imageUrl || '';
 
-    // If a file was uploaded via multer, use the local uploads URL
     if (req.file) {
-      imageUrl = `/uploads/${req.file.filename}`;
+      imageUrl = await processUploadedImage(req.file, 'limelight/slides');
     }
 
     if (!imageUrl) {
@@ -3248,8 +2622,9 @@ app.post('/api/slides', upload.single('image'), (req, res) => {
       createdAt: new Date().toISOString()
     };
 
+    await upsertMongoDoc(Slide, { id: newSlide.id }, newSlide);
     slides.push(newSlide);
-    writeSlides(slides);
+    try { fs.writeFileSync(SLIDES_FILE, JSON.stringify(slides.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
     logActivity('Slide Published', `Uploaded new slide "${newSlide.title}"`);
 
     res.status(201).json({
@@ -3264,29 +2639,20 @@ app.post('/api/slides', upload.single('image'), (req, res) => {
 });
 
 // PUT /api/slides/:id - Update an existing slide
-app.put('/api/slides/:id', upload.single('image'), (req, res) => {
+app.put('/api/slides/:id', upload.single('image'), async (req, res) => {
   try {
-    const slides = readSlides();
-    const index = slides.findIndex(s => s.id === req.params.id);
+    const targetId = req.params.id;
+    const slides = await readCollectionWithMongoFallback(Slide, readSlides);
+    const index = slides.findIndex(s => s.id === targetId || String(s._id) === targetId);
     if (index === -1) {
       return res.status(404).json({ error: 'Slide not found' });
     }
 
-    const existing = slides[index];
+    const existing = stripMongoMeta(slides[index]);
     let imageUrl = existing.imageUrl;
 
-    // If new file uploaded, update image and clean up old local image if any
     if (req.file) {
-      const oldFilename = existing.imageUrl?.startsWith('/uploads/')
-        ? path.basename(existing.imageUrl)
-        : null;
-      if (oldFilename && oldFilename !== 'user-limelight-banner.jpg') {
-        const oldPath = path.join(UPLOADS_DIR, oldFilename);
-        if (fs.existsSync(oldPath)) {
-          try { fs.unlinkSync(oldPath); } catch (e) { /* ignore */ }
-        }
-      }
-      imageUrl = `/uploads/${req.file.filename}`;
+      imageUrl = await processUploadedImage(req.file, 'limelight/slides');
     } else if (req.body.imageUrl) {
       imageUrl = req.body.imageUrl;
     }
@@ -3307,8 +2673,9 @@ app.put('/api/slides/:id', upload.single('image'), (req, res) => {
       updatedAt: new Date().toISOString()
     };
 
+    await upsertMongoDoc(Slide, buildIdFilter(targetId), updatedSlide);
     slides[index] = updatedSlide;
-    writeSlides(slides);
+    try { fs.writeFileSync(SLIDES_FILE, JSON.stringify(slides.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
     logActivity('Slide Updated', `Modified details for "${updatedSlide.title}"`);
 
     res.json({
@@ -3329,18 +2696,8 @@ app.delete('/api/slides/:id', async (req, res) => {
     let found = false;
 
     if (isMongoConnected()) {
-      try {
-        const mongoFilter = {
-          $or: [
-            { id: targetId },
-            ...(mongoose.Types.ObjectId.isValid(targetId) ? [{ _id: targetId }] : [])
-          ]
-        };
-        await Slide.deleteMany(mongoFilter);
-        found = true;
-      } catch (mongoErr) {
-        console.error('Error deleting slide from MongoDB:', mongoErr);
-      }
+      const delRes = await Slide.deleteMany(buildIdFilter(targetId));
+      if (delRes.deletedCount > 0) found = true;
     }
 
     const slides = readSlides();
@@ -3348,17 +2705,6 @@ app.delete('/api/slides/:id', async (req, res) => {
     if (index !== -1) {
       found = true;
       const deleted = slides[index];
-
-      if (deleted.imageUrl && deleted.imageUrl.startsWith('/uploads/')) {
-        const filename = path.basename(deleted.imageUrl);
-        if (filename !== 'user-limelight-banner.jpg') {
-          const filePath = path.join(UPLOADS_DIR, filename);
-          if (fs.existsSync(filePath)) {
-            try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
-          }
-        }
-      }
-
       slides.splice(index, 1);
       try {
         fs.writeFileSync(SLIDES_FILE, JSON.stringify(slides, null, 2), 'utf-8');
@@ -3379,14 +2725,14 @@ app.delete('/api/slides/:id', async (req, res) => {
   }
 });
 
-app.post('/api/slides/reorder', (req, res) => {
+app.post('/api/slides/reorder', async (req, res) => {
   try {
-    const { orderIds } = req.body; // array of slide IDs in desired order
+    const { orderIds } = req.body;
     if (!Array.isArray(orderIds)) {
       return res.status(400).json({ error: 'orderIds must be an array of slide IDs' });
     }
 
-    const slides = readSlides();
+    const slides = (await readCollectionWithMongoFallback(Slide, readSlides)).map(stripMongoMeta);
     slides.forEach(slide => {
       const newOrder = orderIds.indexOf(slide.id);
       if (newOrder !== -1) {
@@ -3394,7 +2740,8 @@ app.post('/api/slides/reorder', (req, res) => {
       }
     });
 
-    writeSlides(slides);
+    await syncCollectionToMongo(Slide, slides);
+    try { fs.writeFileSync(SLIDES_FILE, JSON.stringify(slides, null, 2), 'utf-8'); } catch (e) {}
     res.json({ success: true, message: 'Slides reordered successfully', slides });
   } catch (error) {
     console.error('Error reordering slides:', error);
@@ -3403,7 +2750,11 @@ app.post('/api/slides/reorder', (req, res) => {
 });
 
 // POST /api/slides/reset - Reset to default seed
-app.post('/api/slides/reset', (req, res) => {
+app.post('/api/slides/reset', async (req, res) => {
+  if (isMongoConnected()) {
+    await Slide.deleteMany({});
+    if (DEFAULT_SLIDES.length > 0) await Slide.insertMany(DEFAULT_SLIDES);
+  }
   writeSlides(DEFAULT_SLIDES);
   res.json({ success: true, message: 'Slides reset to default configuration', slides: DEFAULT_SLIDES });
 });
@@ -3415,9 +2766,12 @@ app.post('/api/assistant/chat', async (req, res) => {
     if (!message || !message.trim()) {
       return res.status(400).json({ error: 'Message is required' });
     }
-    const products = readProducts();
-    const routes = readNavigation();
-    const settings = readSettings();
+    const [products, routes, settingsDoc] = await Promise.all([
+      readCollectionWithMongoFallback(Product, readProducts),
+      readCollectionWithMongoFallback(Navigation, readNavigation),
+      isMongoConnected() ? Setting.findOne({ key: 'site_settings' }).lean().catch(() => readSettings()) : Promise.resolve(readSettings())
+    ]);
+    const settings = settingsDoc || readSettings();
 
     const result = await chatWithAssistant(message, history, { products, routes, settings });
     res.json({ success: true, ...result });

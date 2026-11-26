@@ -70,11 +70,23 @@ function readJson(fileName) {
   return null;
 }
 
-// Seed initial data from JSON into MongoDB if collections are empty
+// Seed initial data from JSON into MongoDB ONLY ONCE (so user deletions in Admin never get re-seeded)
 async function seedInitialData() {
   if (!isMongoConnected()) return;
 
   try {
+    const seededMarker = await Setting.findOne({ key: 'initial_seed_done' });
+    const existingProductsCount = await Product.countDocuments();
+    if (seededMarker || existingProductsCount > 0) {
+      if (!seededMarker) {
+        await Setting.updateOne(
+          { key: 'initial_seed_done' },
+          { $set: { key: 'initial_seed_done', seededAt: new Date().toISOString() } },
+          { upsert: true }
+        );
+      }
+      return;
+    }
     // 1. Navigation
     const navCount = await Navigation.countDocuments();
     if (navCount === 0) {
@@ -204,6 +216,12 @@ async function seedInitialData() {
         console.log(`📦 Seeded ${initialSubs.length} subscribers to MongoDB`);
       }
     }
+
+    await Setting.updateOne(
+      { key: 'initial_seed_done' },
+      { $set: { key: 'initial_seed_done', seededAt: new Date().toISOString() } },
+      { upsert: true }
+    );
   } catch (err) {
     console.error('Error during initial MongoDB data seeding:', err.message);
   }
