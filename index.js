@@ -1088,6 +1088,483 @@ app.put('/api/features/:id', async (req, res) => {
     if (index === -1) return res.status(404).json({ error: 'Feature not found' });
 
     const existing = stripMongoMeta(features[index]);
+    const updated = {
+      ...existing,
+      title: req.body.title !== undefined ? req.body.title.trim() : existing.title,
+      subtitle: req.body.subtitle !== undefined ? req.body.subtitle.trim() : existing.subtitle,
+      order: req.body.order !== undefined ? parseInt(req.body.order, 10) : existing.order,
+      isActive: req.body.isActive !== undefined ? (req.body.isActive === 'true' || req.body.isActive === true) : existing.isActive,
+      updatedAt: new Date().toISOString()
+    };
+
+    await upsertMongoDoc(Feature, buildIdFilter(targetId), updated);
+    features[index] = updated;
+    try { fs.writeFileSync(FEATURES_FILE, JSON.stringify(features.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
+    logActivity('Feature Updated', `Updated feature highlight "${updated.title}"`);
+
+    res.json({ success: true, message: 'Feature updated successfully', feature: updated });
+  } catch (error) {
+    console.error('Error updating feature:', error);
+    res.status(500).json({ error: error.message || 'Failed to update feature' });
+  }
+});
+
+// DELETE /api/features/:id - Delete a feature highlight
+app.delete('/api/features/:id', async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    let found = false;
+    if (isMongoConnected()) {
+      const delRes = await Feature.deleteMany(buildIdFilter(targetId));
+      if (delRes.deletedCount > 0) found = true;
+    }
+
+    const features = readFeatures();
+    const index = features.findIndex(f => f.id === targetId || f._id === targetId);
+    if (index !== -1) {
+      found = true;
+      features.splice(index, 1);
+      try { fs.writeFileSync(FEATURES_FILE, JSON.stringify(features, null, 2), 'utf-8'); } catch (e) {}
+    }
+
+    if (!found) return res.status(404).json({ error: 'Feature not found' });
+
+    logActivity('Feature Deleted', `Deleted feature (ID: ${targetId})`);
+    res.json({ success: true, message: 'Feature deleted successfully', id: targetId });
+  } catch (error) {
+    console.error('Error deleting feature:', error);
+    res.status(500).json({ error: error.message || 'Failed to delete feature' });
+  }
+});
+
+// POST /api/features/reorder - Reorder feature highlights
+app.post('/api/features/reorder', async (req, res) => {
+  try {
+    const { orderIds } = req.body;
+    if (!Array.isArray(orderIds)) return res.status(400).json({ error: 'orderIds must be an array of feature IDs' });
+
+    const features = (await readCollectionWithMongoFallback(Feature, readFeatures)).map(stripMongoMeta);
+    features.forEach(feat => {
+      const newOrder = orderIds.indexOf(feat.id);
+      if (newOrder !== -1) feat.order = newOrder + 1;
+    });
+
+    await syncCollectionToMongo(Feature, features);
+    try { fs.writeFileSync(FEATURES_FILE, JSON.stringify(features, null, 2), 'utf-8'); } catch (e) {}
+    logActivity('Features Reordered', `Reordered ${orderIds.length} feature highlights`);
+    res.json({ success: true, message: 'Features reordered successfully', features });
+  } catch (error) {
+    console.error('Error reordering features:', error);
+    res.status(500).json({ error: error.message || 'Failed to reorder features' });
+  }
+});
+
+// POST /api/features/reset - Reset features to default
+app.post('/api/features/reset', async (req, res) => {
+  if (isMongoConnected()) {
+    await Feature.deleteMany({});
+    if (DEFAULT_FEATURES.length > 0) await Feature.insertMany(DEFAULT_FEATURES);
+  }
+  writeFeatures(DEFAULT_FEATURES);
+  logActivity('Features Reset', 'Reset features bar to default values');
+  res.json({ success: true, message: 'Features reset to defaults', features: DEFAULT_FEATURES });
+});
+
+// ================= BANNERS API ROUTES =================
+
+// GET /api/banners - Return all section editorial banners
+app.get('/api/banners', async (req, res) => {
+  const includeInactive = req.query.all === 'true' || req.query.admin === 'true';
+  const banners = await readCollectionWithMongoFallback(Banner, readBanners);
+  const filtered = includeInactive ? banners : banners.filter(b => b.isActive !== false);
+  res.json(filtered);
+});
+
+// GET /api/banners/:id - Single section banner by id or section name
+app.get('/api/banners/:id', async (req, res) => {
+  const targetId = req.params.id;
+  if (isMongoConnected()) {
+    try {
+      const b = await Banner.findOne(buildIdFilter(targetId, ['section'])).lean();
+      if (b) return res.json(b);
+      return res.status(404).json({ error: 'Banner not found' });
+    } catch (err) {
+      console.warn('MongoDB banner error:', err.message);
+    }
+  }
+  const banners = readBanners();
+  const banner = banners.find(b => b.id === targetId || b.section === targetId);
+  if (!banner) {
+    return res.status(404).json({ error: 'Banner not found' });
+  }
+  res.json(banner);
+});
+
+// POST /api/banners - Create or update banner with image upload or URL
+app.post('/api/banners', upload.single('image'), async (req, res) => {
+  try {
+    const banners = await readCollectionWithMongoFallback(Banner, readBanners);
+    let imageUrl = req.body.imageUrl || '';
+
+    if (req.file) {
+      imageUrl = await processUploadedImage(req.file, 'limelight/banners');
+    }
+
+    const id = req.body.id || req.body.section || `banner-${Date.now()}`;
+    const section = req.body.section || id;
+
+    const existingIndex = banners.findIndex(b => b.id === id || b.section === section);
+    if (existingIndex !== -1) {
+      const existing = stripMongoMeta(banners[existingIndex]);
+      const updated = {
+        ...existing,
+        sectionName: req.body.sectionName !== undefined ? req.body.sectionName : existing.sectionName,
+        badge: req.body.badge !== undefined ? req.body.badge : existing.badge,
+        watermark: req.body.watermark !== undefined ? req.body.watermark : existing.watermark,
+        title: req.body.title !== undefined ? req.body.title : existing.title,
+        subtitle: req.body.subtitle !== undefined ? req.body.subtitle : existing.subtitle,
+        scriptText: req.body.scriptText !== undefined ? req.body.scriptText : existing.scriptText,
+        buttonText: req.body.buttonText !== undefined ? req.body.buttonText : existing.buttonText,
+        buttonLink: req.body.buttonLink !== undefined ? req.body.buttonLink : existing.buttonLink,
+        secondaryBtnText: req.body.secondaryBtnText !== undefined ? req.body.secondaryBtnText : existing.secondaryBtnText,
+        secondaryBtnLink: req.body.secondaryBtnLink !== undefined ? req.body.secondaryBtnLink : existing.secondaryBtnLink,
+        imageUrl: imageUrl || existing.imageUrl,
+        isActive: req.body.isActive !== undefined ? (req.body.isActive === 'true' || req.body.isActive === true) : existing.isActive,
+        updatedAt: new Date().toISOString()
+      };
+      await upsertMongoDoc(Banner, buildIdFilter(updated.id, ['section']), updated);
+      banners[existingIndex] = updated;
+      try { fs.writeFileSync(BANNERS_FILE, JSON.stringify(banners.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
+      logActivity('Banner Updated', `Updated editorial banner "${updated.title}"`);
+      return res.json({ success: true, message: 'Banner updated successfully', banner: updated });
+    }
+
+    if (!imageUrl) {
+      return res.status(400).json({ error: 'An image file or imageUrl is required.' });
+    }
+
+    const newBanner = {
+      id,
+      section,
+      sectionName: req.body.sectionName || 'Section Banner',
+      badge: req.body.badge || 'LUXURY WINTER EDIT',
+      watermark: req.body.watermark || 'UNSTITCHED',
+      title: req.body.title || 'UNSTITCHED FABRICS',
+      subtitle: req.body.subtitle || '',
+      scriptText: req.body.scriptText || '',
+      buttonText: req.body.buttonText || 'EXPLORE DESIGNS',
+      buttonLink: req.body.buttonLink || '#unstitched-grid',
+      secondaryBtnText: req.body.secondaryBtnText || 'SHOP NOW',
+      secondaryBtnLink: req.body.secondaryBtnLink || '#unstitched',
+      imageUrl,
+      isActive: req.body.isActive !== undefined ? (req.body.isActive === 'true' || req.body.isActive === true) : true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    await upsertMongoDoc(Banner, { id: newBanner.id }, newBanner);
+    banners.push(newBanner);
+    try { fs.writeFileSync(BANNERS_FILE, JSON.stringify(banners.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
+    logActivity('Banner Created', `Created editorial banner "${newBanner.title}"`);
+    res.status(201).json({ success: true, message: 'Banner created successfully', banner: newBanner });
+  } catch (error) {
+    console.error('Error creating banner:', error);
+    res.status(500).json({ error: error.message || 'Failed to create banner' });
+  }
+});
+
+// PUT /api/banners/:id - Update existing banner
+app.put('/api/banners/:id', upload.single('image'), async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const banners = await readCollectionWithMongoFallback(Banner, readBanners);
+    const index = banners.findIndex(b => b.id === targetId || b.section === targetId || String(b._id) === targetId);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Banner not found' });
+    }
+
+    const existing = stripMongoMeta(banners[index]);
+    let imageUrl = existing.imageUrl;
+
+    if (req.file) {
+      imageUrl = await processUploadedImage(req.file, 'limelight/banners');
+    } else if (req.body.imageUrl) {
+      imageUrl = req.body.imageUrl;
+    }
+
+    const updated = {
+      ...existing,
+      sectionName: req.body.sectionName !== undefined ? req.body.sectionName : existing.sectionName,
+      badge: req.body.badge !== undefined ? req.body.badge : existing.badge,
+      watermark: req.body.watermark !== undefined ? req.body.watermark : existing.watermark,
+      title: req.body.title !== undefined ? req.body.title : existing.title,
+      subtitle: req.body.subtitle !== undefined ? req.body.subtitle : existing.subtitle,
+      scriptText: req.body.scriptText !== undefined ? req.body.scriptText : existing.scriptText,
+      buttonText: req.body.buttonText !== undefined ? req.body.buttonText : existing.buttonText,
+      buttonLink: req.body.buttonLink !== undefined ? req.body.buttonLink : existing.buttonLink,
+      secondaryBtnText: req.body.secondaryBtnText !== undefined ? req.body.secondaryBtnText : existing.secondaryBtnText,
+      secondaryBtnLink: req.body.secondaryBtnLink !== undefined ? req.body.secondaryBtnLink : existing.secondaryBtnLink,
+      imageUrl,
+      isActive: req.body.isActive !== undefined ? (req.body.isActive === 'true' || req.body.isActive === true) : existing.isActive,
+      updatedAt: new Date().toISOString()
+    };
+
+    await upsertMongoDoc(Banner, buildIdFilter(targetId, ['section']), updated);
+    banners[index] = updated;
+    try { fs.writeFileSync(BANNERS_FILE, JSON.stringify(banners.map(stripMongoMeta), null, 2), 'utf-8'); } catch (e) {}
+    logActivity('Banner Updated', `Updated editorial banner "${updated.title}"`);
+
+    res.json({ success: true, message: 'Banner updated successfully', banner: updated });
+  } catch (error) {
+    console.error('Error updating banner:', error);
+    res.status(500).json({ error: error.message || 'Failed to update banner' });
+  }
+});
+
+// DELETE /api/banners/:id - Delete a banner
+app.delete('/api/banners/:id', async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    let found = false;
+    if (isMongoConnected()) {
+      const delRes = await Banner.deleteMany(buildIdFilter(targetId, ['section']));
+      if (delRes.deletedCount > 0) found = true;
+    }
+
+    const banners = readBanners();
+    const index = banners.findIndex(b => b.id === targetId || b.section === targetId);
+    if (index !== -1) {
+      found = true;
+      banners.splice(index, 1);
+      try { fs.writeFileSync(BANNERS_FILE, JSON.stringify(banners, null, 2), 'utf-8'); } catch (e) {}
+    }
+
+    if (!found) {
+      return res.status(404).json({ error: 'Banner not found' });
+    }
+
+    logActivity('Banner Deleted', `Deleted banner (ID: ${targetId})`);
+    res.json({ success: true, message: 'Banner deleted successfully', id: targetId });
+  } catch (error) {
+    console.error('Error deleting banner:', error);
+    res.status(500).json({ error: error.message || 'Failed to delete banner' });
+  }
+});
+
+// POST /api/banners/reset - Reset banners to default
+app.post('/api/banners/reset', async (req, res) => {
+  if (isMongoConnected()) {
+    await Banner.deleteMany({});
+    if (DEFAULT_BANNERS.length > 0) await Banner.insertMany(DEFAULT_BANNERS);
+  }
+  writeBanners(DEFAULT_BANNERS);
+  logActivity('Banners Reset', 'Reset section banners to default editorial values');
+  res.json({ success: true, message: 'Banners reset to defaults', banners: DEFAULT_BANNERS });
+});
+
+// ================= PRODUCTS API ROUTES =================
+
+// GET /api/products - Get all products with optional category & active filters
+app.get('/api/products', async (req, res) => {
+  const includeInactive = req.query.all === 'true' || req.query.admin === 'true';
+  const categoryFilter = req.query.category;
+
+  if (isMongoConnected()) {
+    try {
+      const query = {};
+      if (!includeInactive) {
+        query.isActive = { $ne: false };
+      }
+      if (categoryFilter && categoryFilter.toLowerCase() !== 'all') {
+        query.category = new RegExp(`^${categoryFilter}$`, 'i');
+      }
+      const mongoProducts = await Product.find(query).sort({ createdAt: -1 }).lean();
+      return res.json(mongoProducts || []);
+    } catch (err) {
+      console.warn('MongoDB query error, falling back to JSON:', err.message);
+    }
+  }
+
+  let products = readProducts();
+
+  if (!includeInactive) {
+    products = products.filter(p => p.isActive !== false);
+  }
+
+  if (categoryFilter && categoryFilter.toLowerCase() !== 'all') {
+    products = products.filter(p =>
+      p.category && p.category.toLowerCase() === categoryFilter.toLowerCase()
+    );
+  }
+
+  res.json(products);
+});
+
+// GET /api/products/:id - Single product by ID
+app.get('/api/products/:id', async (req, res) => {
+  const targetId = req.params.id;
+  if (isMongoConnected()) {
+    try {
+      const mongoFilter = {
+        $or: [
+          { id: targetId },
+          ...(mongoose.Types.ObjectId.isValid(targetId) ? [{ _id: targetId }] : [])
+        ]
+      };
+      const p = await Product.findOne(mongoFilter);
+      if (p) return res.json(p);
+    } catch (err) {
+      console.warn('MongoDB single product error:', err.message);
+    }
+  }
+
+  const products = readProducts();
+  const product = products.find(p => p.id === targetId || p._id === targetId);
+  if (!product) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+  res.json(product);
+});
+
+// POST /api/products - Create/Upload new product
+app.post('/api/products', upload.single('image'), async (req, res) => {
+  try {
+    const products = readProducts();
+    let imageUrl = req.body.image || req.body.imageUrl || '';
+
+    if (req.file) {
+      imageUrl = await processUploadedImage(req.file, 'limelight/products');
+    }
+
+    if (!imageUrl) {
+      return res.status(400).json({ error: 'Product photography (image file or URL) is required.' });
+    }
+
+    if (!req.body.title || !req.body.title.trim()) {
+      return res.status(400).json({ error: 'Product title is required.' });
+    }
+
+    const price = parseInt(req.body.price, 10) || 0;
+    const originalPrice = req.body.originalPrice ? parseInt(req.body.originalPrice, 10) : null;
+    let discount = req.body.discount ? req.body.discount.trim() : '';
+
+    if (!discount && originalPrice && originalPrice > price) {
+      const pct = Math.round(((originalPrice - price) / originalPrice) * 100);
+      discount = `${pct}% OFF`;
+    }
+
+    const category = req.body.category || 'Unstitched';
+    const subCategory = req.body.subCategory || '3 Piece';
+
+    let sizes = null;
+    if (req.body.sizes) {
+      try {
+        sizes = typeof req.body.sizes === 'string' ? JSON.parse(req.body.sizes) : req.body.sizes;
+      } catch (e) {
+        sizes = req.body.sizes.split(',').map(s => s.trim()).filter(Boolean);
+      }
+    } else if (category.toLowerCase().includes('ready')) {
+      sizes = ['XS', 'S', 'M', 'L', 'XL'];
+    }
+
+    const fit = req.body.fit || (category.toLowerCase().includes('ready') ? 'Standard Fit' : '');
+
+    const newProduct = {
+      id: `prod-${Date.now()}-${Math.round(Math.random() * 1000)}`,
+      title: req.body.title.trim(),
+      category: category.trim(),
+      subCategory: subCategory.trim(),
+      price: price,
+      originalPrice: originalPrice,
+      discount: discount,
+      image: imageUrl,
+      fabric: req.body.fabric || 'Luxury Fabric',
+      fit: fit,
+      sizes: sizes,
+      pieces: req.body.pieces || subCategory,
+      color: req.body.color || 'Standard',
+      sku: req.body.sku || `LM-${category.slice(0, 2).toUpperCase()}-${Date.now().toString().slice(-4)}`,
+      isActive: req.body.isActive !== undefined ? (req.body.isActive === 'true' || req.body.isActive === true) : true,
+      inStock: req.body.inStock !== undefined ? (req.body.inStock === 'true' || req.body.inStock === true) : true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    if (isMongoConnected()) {
+      try {
+        await Product.create(newProduct);
+      } catch (mongoErr) {
+        console.warn("MongoDB product create error:", mongoErr.message);
+      }
+    }
+
+    products.unshift(newProduct);
+    writeProducts(products);
+    logActivity('Product Created', `Added product "${newProduct.title}" (Rs. ${newProduct.price.toLocaleString()})`);
+
+    res.status(201).json({
+      success: true,
+      message: 'Product created successfully',
+      product: newProduct
+    });
+  } catch (error) {
+    console.error('Error creating product:', error);
+    res.status(500).json({ error: error.message || 'Failed to create product' });
+  }
+});
+
+// PUT /api/products/:id - Update existing product
+app.put('/api/products/:id', upload.single('image'), async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const products = readProducts();
+    const index = products.findIndex(p => p.id === targetId || p._id === targetId);
+
+    let existing = index !== -1 ? products[index] : null;
+
+    if (!existing && isMongoConnected()) {
+      try {
+        const doc = await Product.findOne(buildIdFilter(targetId)).lean();
+        if (doc) existing = doc;
+      } catch (err) {
+        console.warn('MongoDB find error in PUT:', err.message);
+      }
+    }
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    let imageUrl = existing.image;
+
+    if (req.file) {
+      imageUrl = await processUploadedImage(req.file, 'limelight/products');
+    } else if (req.body.image || req.body.imageUrl) {
+      imageUrl = req.body.image || req.body.imageUrl;
+    }
+
+    const price = req.body.price !== undefined ? parseInt(req.body.price, 10) : existing.price;
+    const originalPrice = req.body.originalPrice !== undefined ? (req.body.originalPrice ? parseInt(req.body.originalPrice, 10) : null) : existing.originalPrice;
+    let discount = req.body.discount !== undefined ? req.body.discount : existing.discount;
+
+    if (discount === '' && originalPrice && originalPrice > price) {
+      const pct = Math.round(((originalPrice - price) / originalPrice) * 100);
+      discount = `${pct}% OFF`;
+    }
+
+    let sizes = existing.sizes;
+    if (req.body.sizes !== undefined) {
+      if (!req.body.sizes) {
+        sizes = null;
+      } else {
+        try {
+          sizes = typeof req.body.sizes === 'string' ? JSON.parse(req.body.sizes) : req.body.sizes;
+        } catch (e) {
+          sizes = req.body.sizes ? req.body.sizes.split(',').map(s => s.trim()).filter(Boolean) : null;
+        }
+      }
+    }
+
     const updated = stripMongoMeta({
       ...existing,
       title: req.body.title !== undefined ? req.body.title.trim() : existing.title,
